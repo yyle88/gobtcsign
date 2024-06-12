@@ -14,8 +14,10 @@ import (
 
 // CustomParam 这是客户自定义的参数类型，表示要转入和转出的信息
 type CustomParam struct {
-	VinList []VinType //要转入进BTC节点的
-	OutList []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
+	VinList    []VinType //要转入进BTC节点的
+	OutList    []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
+	ResentAble bool      //默认不需要设置
+	TxSequence uint32    //这是后来出的功能，覆盖交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
 }
 
 type VinType struct {
@@ -40,7 +42,9 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
-		//txIn.Sequence = param.UtxoTxInSequence //这里不设置也行，设置是为了重发交易
+		if param.ResentAble {
+			txIn.Sequence = param.TxSequence //这里不设置也行，设置是为了重发交易
+		}
 		msgTx.AddTxIn(txIn)
 	}
 	for _, output := range param.OutList {
