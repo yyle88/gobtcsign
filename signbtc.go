@@ -42,7 +42,14 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
-		if param.ResentAble {
+		if param.ResentAble { //启用RBF机制
+			// RBF (Replace-By-Fee) 是比特币网络中的一种机制。搜索官方的 “RBF” 即可得到你想要的知识
+			// 简单来说 RBF 就是允许使用相同 utxo 发两次不同的交易，但只有其中的一笔能生效
+			// 在启用 RBF 时发第二笔交易会报错，而允许重发时，发第二笔以后这两笔交易都会成为待打包状态，哪笔会打包和确认得看链上的打包情况
+			// 通常，序列号设置为较高的值（如0xfffffffd），表示交易是可替换的
+			// 因此，推荐的设置就是 txIn.Sequence = wire.MaxTxInSequenceNum - 2
+			// 当然，设置为 0，1，2，3 也是可以的，只不过看着不太专业，推荐还是前面的 `0xfffffffd` 序列号
+			// 理论上每个 txIn 都有独立的序列号，但是在业务中通常就是某个交易里的所有 txIn 使用相同的序列号，这样便于写CRUD逻辑
 			txIn.Sequence = param.TxSequence //这里不设置也行，设置是为了重发交易
 		}
 		msgTx.AddTxIn(txIn)
@@ -68,7 +75,7 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 
 // SignParam 这是待签名的交易信息，基本上最核心的信息就是这些，通过前面的逻辑能构造出这个结构，通过这个结构即可签名，签名后即可发交易
 type SignParam struct {
-	MsgTx     *wire.MsgTx
+	MsgTx     *wire.MsgTx // 既是参数也是返回值：输入时签名前的交易，而最终返回也是在这里，会得到签名后的交易
 	PkScripts [][]byte
 	Amounts   []int64
 	NetParams *chaincfg.Params
