@@ -1,4 +1,4 @@
-# gosignbtc
+# gobtcsign
 
 ## 第一步创建钱包
 

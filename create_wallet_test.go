@@ -1,11 +1,11 @@
-package gosignbtc
+package gobtcsign
 
 import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/stretchr/testify/require"
-	"github.com/yyle88/gosignbtc/dogecoin"
+	"github.com/yyle88/gobtcsign/dogecoin"
 )
 
 func TestCreateWalletP2PKH(t *testing.T) {

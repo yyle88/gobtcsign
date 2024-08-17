@@ -1,4 +1,4 @@
-package gosignbtc
+package gobtcsign
 
 import (
 	"github.com/btcsuite/btcd/btcutil"
