@@ -6,8 +6,8 @@ require (
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/btcsuite/btcd/btcutil v1.1.6
-	github.com/btcsuite/btcwallet/wallet/txrules v1.2.1
-	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.4
+	github.com/btcsuite/btcwallet/wallet/txrules v1.2.2
+	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.5
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.9.0
 )
