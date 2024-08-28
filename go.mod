@@ -1,6 +1,6 @@
 module github.com/yyle88/gobtcsign
 
-go 1.22.3
+go 1.22.6
 
 require (
 	github.com/btcsuite/btcd v0.24.2

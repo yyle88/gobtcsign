@@ -14,16 +14,18 @@ import (
 
 // CustomParam 这是客户自定义的参数类型，表示要转入和转出的信息
 type CustomParam struct {
-	VinList    []VinType //要转入进BTC节点的
-	OutList    []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
-	ResentAble bool      //默认不需要设置
-	TxSequence uint32    //这是后来出的功能，覆盖交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
+	VinList  []VinType //要转入进BTC节点的
+	OutList  []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
+	AllowRBF bool      //当需要RBF时需要设置，推荐启用RBF发交易，否则，当手续费过低时交易会卡在节点的内存池里
+	Sequence uint32    //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
 }
 
 type VinType struct {
 	OutPoint *wire.OutPoint //UTXO的主要信息
 	PkScript []byte
 	Amount   int64
+	AllowRBF bool   //当需要RBF时需要设置，推荐启用RBF发交易
+	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的
 }
 
 type OutType struct {
@@ -42,7 +44,9 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
-		if param.ResentAble { //启用RBF机制
+		if input.AllowRBF || input.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
+			txIn.Sequence = input.Sequence // 当你确实是需要对每个交易单独设置RBF时，就可以在这里设置
+		} else if param.AllowRBF || param.Sequence > 0 { //启用RBF机制，粗放的RBF逻辑
 			// RBF (Replace-By-Fee) 是比特币网络中的一种机制。搜索官方的 “RBF” 即可得到你想要的知识
 			// 简单来说 RBF 就是允许使用相同 utxo 发两次不同的交易，但只有其中的一笔能生效
 			// 在启用 RBF 时发第二笔交易会报错，而允许重发时，发第二笔以后这两笔交易都会成为待打包状态，哪笔会打包和确认得看链上的打包情况
@@ -50,7 +54,7 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 			// 因此，推荐的设置就是 txIn.Sequence = wire.MaxTxInSequenceNum - 2
 			// 当然，设置为 0，1，2，3 也是可以的，只不过看着不太专业，推荐还是前面的 `0xfffffffd` 序列号
 			// 理论上每个 txIn 都有独立的序列号，但是在业务中通常就是某个交易里的所有 txIn 使用相同的序列号，这样便于写CRUD逻辑
-			txIn.Sequence = param.TxSequence //这里不设置也行，设置是为了重发交易
+			txIn.Sequence = param.Sequence //这里不设置也行，设置是为了重发交易
 		}
 		msgTx.AddTxIn(txIn)
 	}
@@ -89,11 +93,13 @@ func Sign(fromAddress string, privateKeyHex string, param *SignParam) error {
 	}
 	privKey, pubKey := btcec.PrivKeyFromBytes(privKeyBytes)
 
+	//使用的网络不同，得到的地址也不同，因此需要确认网络
 	walletAddress, err := btcutil.DecodeAddress(fromAddress, param.NetParams)
 	if err != nil {
 		return errors.WithMessage(err, "wrong from_address")
 	}
-
+	//开发者需要知道这是，这里有4～5种类型，各有各的签名规则
+	//这里只提供有限的几种签名规则，而不是全部
 	switch address := walletAddress; address.(type) {
 	case *btcutil.AddressPubKeyHash: //请参考 txscript.PubKeyHashTy 的签名逻辑
 		//检查钱包的地址是不是压缩的，有压缩和不压缩两种格式的地址，都是可以用的
