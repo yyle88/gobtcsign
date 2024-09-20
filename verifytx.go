@@ -10,8 +10,8 @@ import (
 )
 
 type VerifyTxInputParam struct {
-	PkScript []byte
-	Amount   int64
+	Sender AddressTuple
+	Amount int64
 }
 
 /*
@@ -30,11 +30,15 @@ VerifyTx 验证签名是否有效
 
 NewSigCache 创建的缓存通常不需要显式关闭或清理。它是一个内存中的数据结构，生命周期与其所在的应用程序或模块相同。
 */
-func VerifyTx(msgTx *wire.MsgTx, inputList []*VerifyTxInputParam) error {
+func VerifyTx(msgTx *wire.MsgTx, inputList []*VerifyTxInputParam, netParams *chaincfg.Params) error {
 	var prevScripts = make([][]byte, 0, len(inputList))
 	var inputValues = make([]btcutil.Amount, 0, len(inputList))
 	for idx := range inputList {
-		prevScripts = append(prevScripts, inputList[idx].PkScript)
+		pkScript, err := inputList[idx].Sender.GetPkScript(netParams)
+		if err != nil {
+			return errors.WithMessage(err, "wrong address->pk-script")
+		}
+		prevScripts = append(prevScripts, pkScript)
 		inputValues = append(inputValues, btcutil.Amount(inputList[idx].Amount))
 	}
 
@@ -94,9 +98,12 @@ func VerifyTxV2(msgTx *wire.MsgTx, addresses []string, netParams *chaincfg.Param
 		}
 
 		inputList = append(inputList, &VerifyTxInputParam{
-			PkScript: pkScriptValue,
-			Amount:   0, //绝大多数的签名，比如，P2PKH 签名，不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
+			Sender: AddressTuple{
+				Address:  address,
+				PkScript: pkScriptValue,
+			},
+			Amount: 0, //绝大多数的签名，比如，P2PKH 签名，不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 		})
 	}
-	return VerifyTx(msgTx, inputList)
+	return VerifyTx(msgTx, inputList, netParams)
 }

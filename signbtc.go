@@ -1,6 +1,7 @@
 package gobtcsign
 
 import (
+	"bytes"
 	"encoding/hex"
 	"reflect"
 
@@ -14,23 +15,45 @@ import (
 
 // CustomParam 这是客户自定义的参数类型，表示要转入和转出的信息
 type CustomParam struct {
-	VinList  []VinType //要转入进BTC节点的
-	OutList  []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
-	AllowRBF bool      //当需要RBF时需要设置，推荐启用RBF发交易，否则，当手续费过低时交易会卡在节点的内存池里
-	Sequence uint32    //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
+	VinList []VinType //要转入进BTC节点的
+	OutList []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
+	RBFInfo RBFConfig
 }
 
 type VinType struct {
-	OutPoint *wire.OutPoint //UTXO的主要信息
-	PkScript []byte
+	OutPoint wire.OutPoint //UTXO的主要信息
+	Sender   AddressTuple
 	Amount   int64
-	AllowRBF bool   //当需要RBF时需要设置，推荐启用RBF发交易
-	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的
+	RBFInfo  RBFConfig
 }
 
 type OutType struct {
-	Address string
-	Amount  int64
+	Target AddressTuple
+	Amount int64
+}
+
+type AddressTuple struct {
+	Address  string
+	PkScript []byte
+}
+
+func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error) {
+	if len(one.PkScript) > 0 {
+		return one.PkScript, nil
+	}
+	return GetAddressPkScript(one.Address, netParams)
+}
+
+type RBFConfig struct {
+	AllowRBF bool   //当需要RBF时需要设置，推荐启用RBF发交易，否则，当手续费过低时交易会卡在节点的内存池里
+	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
+}
+
+func (cfg *RBFConfig) GetSequence() uint32 {
+	if cfg.AllowRBF || cfg.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
+		return cfg.Sequence
+	}
+	return wire.MaxTxInSequenceNum
 }
 
 // NewSignParam 根据用户的输入信息拼接交易
@@ -39,29 +62,25 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 	var pkScripts [][]byte
 	var amounts []int64
 	for _, input := range param.VinList {
-		pkScripts = append(pkScripts, input.PkScript)
+		pkScript, err := input.Sender.GetPkScript(netParams)
+		if err != nil {
+			return nil, errors.WithMessage(err, "wrong sender.address->pk-script")
+		}
+		pkScripts = append(pkScripts, pkScript)
 		amounts = append(amounts, input.Amount)
 
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
-		if input.AllowRBF || input.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
-			txIn.Sequence = input.Sequence // 当你确实是需要对每个交易单独设置RBF时，就可以在这里设置
-		} else if param.AllowRBF || param.Sequence > 0 { //启用RBF机制，粗放的RBF逻辑
-			// RBF (Replace-By-Fee) 是比特币网络中的一种机制。搜索官方的 “RBF” 即可得到你想要的知识
-			// 简单来说 RBF 就是允许使用相同 utxo 发两次不同的交易，但只有其中的一笔能生效
-			// 在启用 RBF 时发第二笔交易会报错，而允许重发时，发第二笔以后这两笔交易都会成为待打包状态，哪笔会打包和确认得看链上的打包情况
-			// 通常，序列号设置为较高的值（如0xfffffffd），表示交易是可替换的
-			// 因此，推荐的设置就是 txIn.Sequence = wire.MaxTxInSequenceNum - 2
-			// 当然，设置为 0，1，2，3 也是可以的，只不过看着不太专业，推荐还是前面的 `0xfffffffd` 序列号
-			// 理论上每个 txIn 都有独立的序列号，但是在业务中通常就是某个交易里的所有 txIn 使用相同的序列号，这样便于写CRUD逻辑
-			txIn.Sequence = param.Sequence //这里不设置也行，设置是为了重发交易
+		// 查看是否需要启用 RBF 机制
+		if seqNo := calcTxInSequenceNum(input, param); seqNo != wire.MaxTxInSequenceNum {
+			txIn.Sequence = seqNo
 		}
 		msgTx.AddTxIn(txIn)
 	}
 	for _, output := range param.OutList {
-		pkScript, err := GetAddressPkScript(output.Address, netParams)
+		pkScript, err := output.Target.GetPkScript(netParams)
 		if err != nil {
-			return nil, errors.WithMessage(err, "wrong address->pk-script")
+			return nil, errors.WithMessage(err, "wrong target.address->pk-script")
 		}
 		msgTx.AddTxOut(wire.NewTxOut(output.Amount, pkScript))
 	}
@@ -71,6 +90,26 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 		Amounts:   amounts,
 		NetParams: netParams,
 	}, nil
+}
+
+func calcTxInSequenceNum(input VinType, param CustomParam) uint32 {
+	// 当你确实是需要对每个交易单独设置RBF时，就可以在这里设置，单独设置到这个 vin 里面
+	if seqNo := input.RBFInfo.GetSequence(); seqNo != wire.MaxTxInSequenceNum { //启用RBF机制，精确的RBF逻辑
+		return seqNo
+	}
+	// 这里不设置也行，设置是为了启用 RBF 机制，设置到全部 vin 里面，当然前面的 RBF 会优先设置
+	if seqNo := param.RBFInfo.GetSequence(); seqNo != wire.MaxTxInSequenceNum { //启用RBF机制，粗放的RBF逻辑
+		// RBF (Replace-By-Fee) 是比特币网络中的一种机制。搜索官方的 “RBF” 即可得到你想要的知识
+		// 简单来说 RBF 就是允许使用相同 utxo 发两次不同的交易，但只有其中的一笔能生效
+		// 在启用 RBF 时发第二笔交易会报错，而允许重发时，发第二笔以后这两笔交易都会成为待打包状态，哪笔会打包和确认得看链上的打包情况
+		// 通常，序列号设置为较高的值（如0xfffffffd），表示交易是可替换的
+		// 因此，推荐的设置就是 txIn.Sequence = wire.MaxTxInSequenceNum - 2
+		// 当然，设置为 0，1，2，3 也是可以的，只不过看着不太专业，推荐还是前面的 `0xfffffffd` 序列号
+		// 理论上每个 txIn 都有独立的序列号，但是在业务中通常就是某个交易里的所有 txIn 使用相同的序列号，这样便于写CRUD逻辑
+		return seqNo
+	}
+	// 当都没有设置的时候，就使用默认值就行
+	return wire.MaxTxInSequenceNum
 }
 
 // SignParam 这是待签名的交易信息，基本上最核心的信息就是这些，通过前面的逻辑能构造出这个结构，通过这个结构即可签名，签名后即可发交易
@@ -160,6 +199,51 @@ func VerifyP2PKHSign(tx *wire.MsgTx, pkScripts [][]byte, amounts []int64) error 
 		}
 		if err = vm.Execute(); err != nil {
 			return errors.Errorf("wrong vm execute. index=%d error=%v", idx, err)
+		}
+	}
+	return nil
+}
+
+// CheckMsgTxSameWithParam 避免签名逻辑修改数量和目标位置
+func CheckMsgTxSameWithParam(msgTx *wire.MsgTx, param CustomParam, netParams *chaincfg.Params) error {
+	// 验证输入的长度是否匹配
+	if len(msgTx.TxIn) != len(param.VinList) {
+		return errors.Errorf("input count mismatch: got %d, expected %d", len(msgTx.TxIn), len(param.VinList))
+	}
+	// 验证每个输入的哈希和位置是否匹配
+	for idx, txVin := range msgTx.TxIn {
+		input := param.VinList[idx]
+		// 检查 UTXO 的 OutPoint 是否匹配
+		if txVin.PreviousOutPoint.Hash != input.OutPoint.Hash {
+			return errors.Errorf("input %d outpoint-hash mismatch: got %v, expected %v", idx, txVin.PreviousOutPoint.Hash, input.OutPoint.Hash)
+		}
+		// 检查在交易输出中的位置是否完全匹配
+		if txVin.PreviousOutPoint.Index != input.OutPoint.Index {
+			return errors.Errorf("input %d outpoint-index mismatch: got %v, expected %v", idx, txVin.PreviousOutPoint.Index, input.OutPoint.Index)
+		}
+		// 检查 vin 的 RBF 序号是否完全匹配
+		if seqNo := calcTxInSequenceNum(input, param); seqNo != txVin.Sequence {
+			return errors.Errorf("input %d tx-in-sequence mismatch: got %v, expected %v", idx, txVin.Sequence, seqNo)
+		}
+	}
+	// 验证输出数量是否匹配
+	if len(msgTx.TxOut) != len(param.OutList) {
+		return errors.Errorf("output count mismatch: got %d, expected %d", len(msgTx.TxOut), len(param.OutList))
+	}
+	// 验证每个输出的地址和金额是否匹配
+	for idx, txVout := range msgTx.TxOut {
+		output := param.OutList[idx]
+		// 验证输出地址
+		pkScript, err := output.Target.GetPkScript(netParams)
+		if err != nil {
+			return errors.Errorf("cannot get pkScript of address %s: %v", output.Target.Address, err)
+		}
+		if !bytes.Equal(txVout.PkScript, pkScript) {
+			return errors.Errorf("output %d script mismatch: got %x, expected %x", idx, txVout.PkScript, pkScript)
+		}
+		// 验证输出金额
+		if txVout.Value != output.Amount {
+			return errors.Errorf("output %d amount mismatch: got %d, expected %d", idx, txVout.Value, output.Amount)
 		}
 	}
 	return nil
