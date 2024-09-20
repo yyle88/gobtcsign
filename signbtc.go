@@ -59,13 +59,9 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 		msgTx.AddTxIn(txIn)
 	}
 	for _, output := range param.OutList {
-		address, err := btcutil.DecodeAddress(output.Address, netParams)
+		pkScript, err := GetAddressPkScript(output.Address, netParams)
 		if err != nil {
-			return nil, errors.WithMessage(err, "wrong encrypt.decode_address")
-		}
-		pkScript, err := txscript.PayToAddrScript(address)
-		if err != nil {
-			return nil, errors.WithMessage(err, "wrong encrypt.pay_to_addr_script")
+			return nil, errors.WithMessage(err, "wrong address->pk-script")
 		}
 		msgTx.AddTxOut(wire.NewTxOut(output.Amount, pkScript))
 	}
