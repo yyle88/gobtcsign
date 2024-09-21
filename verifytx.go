@@ -82,11 +82,11 @@ VerifyTxV2 验证签名是否有效
 
 因此这里就是给的utxo的来源地址列表（按正确顺序排列，而且条数要相同）。
 */
-func VerifyTxV2(msgTx *wire.MsgTx, addresses []string, netParams *chaincfg.Params) error {
-	var inputList = make([]*VerifyTxInputParam, 0, len(addresses))
+func VerifyTxV2(msgTx *wire.MsgTx, sendersAddresses []string, netParams *chaincfg.Params) error {
+	var inputList = make([]*VerifyTxInputParam, 0, len(sendersAddresses))
 
-	var address2pkMap = make(map[string][]byte, len(addresses))
-	for _, address := range addresses {
+	var address2pkMap = make(map[string][]byte, len(sendersAddresses))
+	for _, address := range sendersAddresses {
 		pkScriptValue, ok := address2pkMap[address]
 		if !ok {
 			pkScript, err := GetAddressPkScript(address, netParams)

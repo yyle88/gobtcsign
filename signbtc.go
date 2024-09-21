@@ -17,26 +17,27 @@ import (
 type CustomParam struct {
 	VinList []VinType //要转入进BTC节点的
 	OutList []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
-	RBFInfo RBFConfig
+	RBFInfo RBFConfig //详见RBF机制，通常是需要启用RBF以免交易长期被卡的
 }
 
 type VinType struct {
 	OutPoint wire.OutPoint //UTXO的主要信息
-	Sender   AddressTuple
-	Amount   int64
-	RBFInfo  RBFConfig
+	Sender   AddressTuple  //发送者信息，钱包地址或者公钥文本，二选一填写即可
+	Amount   int64         //发送数量，因为这里不是浮点数，因此很明显这里传的是聪的数量
+	RBFInfo  RBFConfig     //还是RBF机制，前面的是控制整个交易的，这里控制单个UTXO的
 }
 
 type OutType struct {
-	Target AddressTuple
-	Amount int64
+	Target AddressTuple //接收者信息，钱包地址和公钥文本，二选一填写即可
+	Amount int64        //聪的数量
 }
 
 type AddressTuple struct {
-	Address  string
-	PkScript []byte
+	Address  string //钱包地址，和 公钥文本 二选一填写即可
+	PkScript []byte //PkScript（Public Key Script，公钥脚本），和 钱包地址 二选一填写即可
 }
 
+// GetPkScript 获得公钥文本，当公钥文本存在时就用已有的，否则就根据地址计算
 func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error) {
 	if len(one.PkScript) > 0 {
 		return one.PkScript, nil
@@ -53,7 +54,7 @@ func (cfg *RBFConfig) GetSequence() uint32 {
 	if cfg.AllowRBF || cfg.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
 		return cfg.Sequence
 	}
-	return wire.MaxTxInSequenceNum
+	return wire.MaxTxInSequenceNum //默认值
 }
 
 // NewSignParam 根据用户的输入信息拼接交易
@@ -71,6 +72,9 @@ func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, er
 
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
+		if txIn.Sequence != wire.MaxTxInSequenceNum { //这里做个断言，因为我后面的逻辑都是基于默认值是它而写的
+			return nil, errors.Errorf("wrong tx_in.sequence default value: %v", txIn.Sequence)
+		}
 		// 查看是否需要启用 RBF 机制
 		if seqNo := calcTxInSequenceNum(input, param); seqNo != wire.MaxTxInSequenceNum {
 			txIn.Sequence = seqNo
@@ -121,7 +125,7 @@ type SignParam struct {
 }
 
 // Sign 根据钱包地址和钱包私钥签名
-func Sign(fromAddress string, privateKeyHex string, param *SignParam) error {
+func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 	privKeyBytes, err := hex.DecodeString(privateKeyHex)
 	if err != nil {
 		return errors.WithMessage(err, "wrong decode private key string")
@@ -129,7 +133,7 @@ func Sign(fromAddress string, privateKeyHex string, param *SignParam) error {
 	privKey, pubKey := btcec.PrivKeyFromBytes(privKeyBytes)
 
 	//使用的网络不同，得到的地址也不同，因此需要确认网络
-	walletAddress, err := btcutil.DecodeAddress(fromAddress, param.NetParams)
+	walletAddress, err := btcutil.DecodeAddress(senderAddress, param.NetParams)
 	if err != nil {
 		return errors.WithMessage(err, "wrong from_address")
 	}
@@ -138,7 +142,7 @@ func Sign(fromAddress string, privateKeyHex string, param *SignParam) error {
 	switch address := walletAddress; address.(type) {
 	case *btcutil.AddressPubKeyHash: //请参考 txscript.PubKeyHashTy 的签名逻辑
 		//检查钱包的地址是不是压缩的，有压缩和不压缩两种格式的地址，都是可以用的
-		compress, err := CheckPKHAddressIsCompress(param.NetParams, pubKey, fromAddress)
+		compress, err := CheckPKHAddressIsCompress(param.NetParams, pubKey, senderAddress)
 		if err != nil {
 			return errors.WithMessage(err, "wrong sign check_from_address_is_compress")
 		}
@@ -152,7 +156,7 @@ func Sign(fromAddress string, privateKeyHex string, param *SignParam) error {
 	return nil
 }
 
-func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.PublicKey, fromAddress string) (bool, error) {
+func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.PublicKey, senderAddress string) (bool, error) {
 	for _, isCompress := range []bool{true, false} {
 		var pubKeyHash []byte
 		if isCompress {
@@ -165,11 +169,11 @@ func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.Pub
 		if err != nil {
 			return isCompress, errors.Errorf("error=%v when is_compress=%v", err, isCompress)
 		}
-		if address.EncodeAddress() == fromAddress {
+		if address.EncodeAddress() == senderAddress {
 			return isCompress, nil
 		}
 	}
-	return false, errors.Errorf("unknown address type. address=%s", fromAddress)
+	return false, errors.Errorf("unknown address type. address=%s", senderAddress)
 }
 
 func SignP2PKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
