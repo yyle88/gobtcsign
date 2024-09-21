@@ -13,109 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CustomParam 这是客户自定义的参数类型，表示要转入和转出的信息
-type CustomParam struct {
-	VinList []VinType //要转入进BTC节点的
-	OutList []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
-	RBFInfo RBFConfig //详见RBF机制，通常是需要启用RBF以免交易长期被卡的
-}
-
-type VinType struct {
-	OutPoint wire.OutPoint //UTXO的主要信息
-	Sender   AddressTuple  //发送者信息，钱包地址或者公钥文本，二选一填写即可
-	Amount   int64         //发送数量，因为这里不是浮点数，因此很明显这里传的是聪的数量
-	RBFInfo  RBFConfig     //还是RBF机制，前面的是控制整个交易的，这里控制单个UTXO的
-}
-
-type OutType struct {
-	Target AddressTuple //接收者信息，钱包地址和公钥文本，二选一填写即可
-	Amount int64        //聪的数量
-}
-
-type AddressTuple struct {
-	Address  string //钱包地址，和 公钥文本 二选一填写即可
-	PkScript []byte //PkScript（Public Key Script，公钥脚本），和 钱包地址 二选一填写即可
-}
-
-// GetPkScript 获得公钥文本，当公钥文本存在时就用已有的，否则就根据地址计算
-func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error) {
-	if len(one.PkScript) > 0 {
-		return one.PkScript, nil
-	}
-	return GetAddressPkScript(one.Address, netParams)
-}
-
-type RBFConfig struct {
-	AllowRBF bool   //当需要RBF时需要设置，推荐启用RBF发交易，否则，当手续费过低时交易会卡在节点的内存池里
-	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
-}
-
-func (cfg *RBFConfig) GetSequence() uint32 {
-	if cfg.AllowRBF || cfg.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
-		return cfg.Sequence
-	}
-	return wire.MaxTxInSequenceNum //默认值
-}
-
-// NewSignParam 根据用户的输入信息拼接交易
-func NewSignParam(param CustomParam, netParams *chaincfg.Params) (*SignParam, error) {
-	var msgTx = wire.NewMsgTx(wire.TxVersion)
-	var pkScripts [][]byte
-	var amounts []int64
-	for _, input := range param.VinList {
-		pkScript, err := input.Sender.GetPkScript(netParams)
-		if err != nil {
-			return nil, errors.WithMessage(err, "wrong sender.address->pk-script")
-		}
-		pkScripts = append(pkScripts, pkScript)
-		amounts = append(amounts, input.Amount)
-
-		utxo := input.OutPoint
-		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
-		if txIn.Sequence != wire.MaxTxInSequenceNum { //这里做个断言，因为我后面的逻辑都是基于默认值是它而写的
-			return nil, errors.Errorf("wrong tx_in.sequence default value: %v", txIn.Sequence)
-		}
-		// 查看是否需要启用 RBF 机制
-		if seqNo := calcTxInSequenceNum(input, param); seqNo != wire.MaxTxInSequenceNum {
-			txIn.Sequence = seqNo
-		}
-		msgTx.AddTxIn(txIn)
-	}
-	for _, output := range param.OutList {
-		pkScript, err := output.Target.GetPkScript(netParams)
-		if err != nil {
-			return nil, errors.WithMessage(err, "wrong target.address->pk-script")
-		}
-		msgTx.AddTxOut(wire.NewTxOut(output.Amount, pkScript))
-	}
-	return &SignParam{
-		MsgTx:     msgTx,
-		PkScripts: pkScripts,
-		Amounts:   amounts,
-		NetParams: netParams,
-	}, nil
-}
-
-func calcTxInSequenceNum(input VinType, param CustomParam) uint32 {
-	// 当你确实是需要对每个交易单独设置RBF时，就可以在这里设置，单独设置到这个 vin 里面
-	if seqNo := input.RBFInfo.GetSequence(); seqNo != wire.MaxTxInSequenceNum { //启用RBF机制，精确的RBF逻辑
-		return seqNo
-	}
-	// 这里不设置也行，设置是为了启用 RBF 机制，设置到全部 vin 里面，当然前面的 RBF 会优先设置
-	if seqNo := param.RBFInfo.GetSequence(); seqNo != wire.MaxTxInSequenceNum { //启用RBF机制，粗放的RBF逻辑
-		// RBF (Replace-By-Fee) 是比特币网络中的一种机制。搜索官方的 “RBF” 即可得到你想要的知识
-		// 简单来说 RBF 就是允许使用相同 utxo 发两次不同的交易，但只有其中的一笔能生效
-		// 在启用 RBF 时发第二笔交易会报错，而允许重发时，发第二笔以后这两笔交易都会成为待打包状态，哪笔会打包和确认得看链上的打包情况
-		// 通常，序列号设置为较高的值（如0xfffffffd），表示交易是可替换的
-		// 因此，推荐的设置就是 txIn.Sequence = wire.MaxTxInSequenceNum - 2
-		// 当然，设置为 0，1，2，3 也是可以的，只不过看着不太专业，推荐还是前面的 `0xfffffffd` 序列号
-		// 理论上每个 txIn 都有独立的序列号，但是在业务中通常就是某个交易里的所有 txIn 使用相同的序列号，这样便于写CRUD逻辑
-		return seqNo
-	}
-	// 当都没有设置的时候，就使用默认值就行
-	return wire.MaxTxInSequenceNum
-}
-
 // SignParam 这是待签名的交易信息，基本上最核心的信息就是这些，通过前面的逻辑能构造出这个结构，通过这个结构即可签名，签名后即可发交易
 type SignParam struct {
 	MsgTx     *wire.MsgTx // 既是参数也是返回值：输入时签名前的交易，而最终返回也是在这里，会得到签名后的交易
@@ -195,9 +92,9 @@ func SignP2PKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) e
 	return VerifyP2PKHSign(msgTx, pkScripts, amounts)
 }
 
-func VerifyP2PKHSign(tx *wire.MsgTx, pkScripts [][]byte, amounts []int64) error {
-	for idx := range tx.TxIn { // 这段代码的作用是创建和执行脚本引擎，用于验证指定的脚本是否有效。如果脚本验证失败，则返回错误信息。这在比特币交易的验证过程中非常重要，以确保交易的合法性和安全性。
-		vm, err := txscript.NewEngine(pkScripts[idx], tx, idx, txscript.StandardVerifyFlags, nil, nil, amounts[idx], nil)
+func VerifyP2PKHSign(msgTx *wire.MsgTx, pkScripts [][]byte, amounts []int64) error {
+	for idx := range msgTx.TxIn { // 这段代码的作用是创建和执行脚本引擎，用于验证指定的脚本是否有效。如果脚本验证失败，则返回错误信息。这在比特币交易的验证过程中非常重要，以确保交易的合法性和安全性。
+		vm, err := txscript.NewEngine(pkScripts[idx], msgTx, idx, txscript.StandardVerifyFlags, nil, nil, amounts[idx], nil)
 		if err != nil {
 			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
 		}
@@ -226,7 +123,7 @@ func CheckMsgTxSameWithParam(msgTx *wire.MsgTx, param CustomParam, netParams *ch
 			return errors.Errorf("input %d outpoint-index mismatch: got %v, expected %v", idx, txVin.PreviousOutPoint.Index, input.OutPoint.Index)
 		}
 		// 检查 vin 的 RBF 序号是否完全匹配
-		if seqNo := calcTxInSequenceNum(input, param); seqNo != txVin.Sequence {
+		if seqNo := param.GetTxInSequenceNum(input); seqNo != txVin.Sequence {
 			return errors.Errorf("input %d tx-in-sequence mismatch: got %v, expected %v", idx, txVin.Sequence, seqNo)
 		}
 	}

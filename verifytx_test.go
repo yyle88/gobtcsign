@@ -19,7 +19,7 @@ func TestVerifyTx_DOGE_testnet(t *testing.T) {
 	pkScript, err := GetAddressPkScript(address, netParams)
 	require.NoError(t, err)
 
-	require.NoError(t, VerifyTx(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifyP2PKHSignV2(msgTx, []*VerifyTxInputParam{
 		&VerifyTxInputParam{
 			Sender: AddressTuple{
 				Address:  address,
@@ -42,7 +42,7 @@ func TestVerifyTx_DOGE_mainnet(t *testing.T) {
 	pkScript, err := GetAddressPkScript(address, netParams)
 	require.NoError(t, err)
 
-	require.NoError(t, VerifyTx(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifyP2PKHSignV2(msgTx, []*VerifyTxInputParam{
 		&VerifyTxInputParam{
 			Sender: AddressTuple{
 				Address:  address,
@@ -68,7 +68,7 @@ func TestVerifyTx_DOGE_mainnet_2(t *testing.T) {
 		"DJnqNZJn21HKJjEzjLTTWToBpvZPjomTnR",
 	}
 
-	require.NoError(t, VerifyTxV2(msgTx, addresses, &dogecoin.MainNetParams))
+	require.NoError(t, VerifyP2PKHSignV3(msgTx, addresses, &dogecoin.MainNetParams))
 }
 
 func TestVerifyTx_DOGE_mainnet_3(t *testing.T) {
@@ -85,5 +85,5 @@ func TestVerifyTx_DOGE_mainnet_3(t *testing.T) {
 		"DHQsfy66JsYSnwjCABFN6NNqW4kHQe63oU",
 	}
 
-	require.NoError(t, VerifyTxV2(msgTx, addresses, &dogecoin.MainNetParams))
+	require.NoError(t, VerifyP2PKHSignV3(msgTx, addresses, &dogecoin.MainNetParams))
 }
