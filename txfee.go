@@ -37,22 +37,9 @@ func CalculateMsgTxSize(msgTx *wire.MsgTx, changeAddress btcutil.Address) (int, 
 // CalculateSize 计算交易的预估大小（在最坏情况下的预估大小）
 // 这个函数的参数详见前面函数的调用
 func CalculateSize(scripts [][]byte, outputs []*wire.TxOut, changeAddress btcutil.Address) (int, error) {
-	changeAddressScript, err := txscript.PayToAddrScript(changeAddress)
+	changeScriptSize, err := CalculateChangeAddressSize(changeAddress)
 	if err != nil {
-		return 0, errors.WithMessage(err, "wrong change_address")
-	}
-	var scriptSize int
-	switch {
-	case txscript.IsPayToPubKeyHash(changeAddressScript):
-		scriptSize = txsizes.P2PKHPkScriptSize
-	case txscript.IsPayToScriptHash(changeAddressScript):
-		scriptSize = txsizes.NestedP2WPKHPkScriptSize
-	case txscript.IsPayToWitnessPubKeyHash(changeAddressScript), txscript.IsPayToWitnessScriptHash(changeAddressScript):
-		scriptSize = txsizes.P2WPKHPkScriptSize
-	case txscript.IsPayToTaproot(changeAddressScript):
-		scriptSize = txsizes.P2TRPkScriptSize
-	default:
-		return 0, errors.New("UNSUPPORTED ADDRESS TYPE")
+		return 0, errors.WithMessage(err, "calculate change script size")
 	}
 
 	// We count the types of inputs, which we'll use to estimate
@@ -72,8 +59,31 @@ func CalculateSize(scripts [][]byte, outputs []*wire.TxOut, changeAddress btcuti
 			p2pkh++
 		}
 	}
+
+	// 仿照这个函数 txauthor.NewUnsignedTransaction() 里的预估逻辑
 	maxSignedSize := txsizes.EstimateVirtualSize(
-		p2pkh, p2tr, p2wpkh, nested, outputs, scriptSize,
+		p2pkh, p2tr, p2wpkh, nested, outputs, changeScriptSize,
 	)
 	return maxSignedSize, nil
+}
+
+func CalculateChangeAddressSize(address btcutil.Address) (int, error) {
+	script, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		return 0, errors.WithMessage(err, "wrong change_address")
+	}
+	var size int
+	switch {
+	case txscript.IsPayToPubKeyHash(script):
+		size = txsizes.P2PKHPkScriptSize
+	case txscript.IsPayToScriptHash(script):
+		size = txsizes.NestedP2WPKHPkScriptSize
+	case txscript.IsPayToWitnessPubKeyHash(script), txscript.IsPayToWitnessScriptHash(script):
+		size = txsizes.P2WPKHPkScriptSize
+	case txscript.IsPayToTaproot(script):
+		size = txsizes.P2TRPkScriptSize
+	default:
+		return 0, errors.New("UNSUPPORTED ADDRESS TYPE")
+	}
+	return size, nil
 }
