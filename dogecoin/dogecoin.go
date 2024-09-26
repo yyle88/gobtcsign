@@ -5,14 +5,14 @@ import (
 )
 
 func init() {
-	if err := chaincfg.Register(&MainNetParams); err != nil {
-		panic(err)
+	if erx := chaincfg.Register(&MainNetParams); erx != nil {
+		panic(erx)
 	}
-	if err := chaincfg.Register(&TestNetParams); err != nil {
-		panic(err)
+	if erx := chaincfg.Register(&TestNetParams); erx != nil {
+		panic(erx)
 	}
-	if err := chaincfg.Register(&RegressionNetParams); err != nil {
-		panic(err)
+	if erx := chaincfg.Register(&RegressionNetParams); erx != nil {
+		panic(erx)
 	}
 }
 
