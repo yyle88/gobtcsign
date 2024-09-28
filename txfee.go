@@ -13,12 +13,14 @@ import (
 // 代码基本是仿照这里的 github.com/btcsuite/btcwallet/wallet/txauthor@v1.3.4/author.go 里面 NewUnsignedTransaction 的逻辑
 // 需要特别注意的是，这里只是个使用的样例
 // 由于是计算手续费的，因为这个交易里不应该包含找零的 output 信息，否则结果是无意义的
-func CalculateMsgTxFee(msgTx *wire.MsgTx, changeAddress btcutil.Address, feeRatePerKb btcutil.Amount) (btcutil.Amount, error) {
+func CalculateMsgTxFee(msgTx *wire.MsgTx, changeAddress btcutil.Address, feeRatePerKb btcutil.Amount, dustFeeConfig DustFeeConfig) (btcutil.Amount, error) {
 	maxSignedSize, err := CalculateMsgTxSize(msgTx, changeAddress)
 	if err != nil {
 		return 0, errors.WithMessage(err, "calculate size is wrong")
 	}
-	maxRequiredFee := txrules.FeeForSerializeSize(feeRatePerKb, maxSignedSize)
+	//有的链比如 DOGE_COIN 有软灰尘的概念，软灰尘需要消耗更高的手续费，而且这个手续费是不能协商的，而是必须交的，就得在这里交灰尘费
+	maxRequiredFee := txrules.FeeForSerializeSize(feeRatePerKb, maxSignedSize) + dustFeeConfig.GetSoftDustsFee(msgTx.TxOut)
+	//但是请注意，input-output-maxFee 的结果还可能是个软灰尘，这时候就还得再增加找零的软灰尘费用，这个是后续逻辑需要考虑的
 	return maxRequiredFee, nil
 }
 
