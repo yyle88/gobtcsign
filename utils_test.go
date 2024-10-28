@@ -1,10 +1,12 @@
 package gobtcsign
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/stretchr/testify/require"
+	"github.com/yyle88/gobtcsign/dogecoin"
 )
 
 func TestIsDustOutputDoge(t *testing.T) {
@@ -40,4 +42,20 @@ func TestIsDustOutputBtc(t *testing.T) {
 	}
 	t.Log("amount:", amount, "IS NOT DUST IN BTC")
 	t.Log("amount:", amount-1, "IS DUST IN BTC")
+}
+
+func TestGetAddressPkScript(t *testing.T) {
+	netParams := dogecoin.TestNetParams
+	pkScript := caseGetAddressPkScript(t, "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP", netParams)
+
+	// 这里写个简单的比较逻辑
+	pkTarget, err := base64.StdEncoding.DecodeString("dqkUIqn5GrQ9r5dmyzOQ/RTb+qkqVQqIrA==")
+	require.NoError(t, err)
+	require.Equal(t, pkTarget, pkScript)
+}
+
+func caseGetAddressPkScript(t *testing.T, rawAddress string, netParams chaincfg.Params) []byte {
+	pkScript, err := GetAddressPkScript(rawAddress, &netParams)
+	require.NoError(t, err)
+	return pkScript
 }
