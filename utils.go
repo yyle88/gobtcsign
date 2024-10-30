@@ -21,8 +21,8 @@ func GetTxHash(msgTx *wire.MsgTx) string {
 	return msgTx.TxHash().String()
 }
 
-// CvtMsgTxToTxHex 把go语言消息体转换为btc链上通用的hex字符串
-func CvtMsgTxToTxHex(msgTx *wire.MsgTx) (string, error) {
+// CvtMsgTxToHex 把go语言消息体转换为btc链上通用的hex字符串
+func CvtMsgTxToHex(msgTx *wire.MsgTx) (string, error) {
 	outTo := bytes.NewBuffer(make([]byte, 0, msgTx.SerializeSize()))
 	if err := msgTx.Serialize(outTo); err != nil {
 		return "", errors.WithMessage(err, "wrong serialize")
@@ -31,8 +31,8 @@ func CvtMsgTxToTxHex(msgTx *wire.MsgTx) (string, error) {
 	return txHex, nil
 }
 
-// NewMsgTxFromTxHex 通过交易信息的hex字符串，再反序列化出交易消息体
-func NewMsgTxFromTxHex(txHex string) (*wire.MsgTx, error) {
+// NewMsgTxFromHex 通过交易信息的hex字符串，再反序列化出交易消息体
+func NewMsgTxFromHex(txHex string) (*wire.MsgTx, error) {
 	data, err := hex.DecodeString(txHex)
 	if err != nil {
 		return nil, errors.WithMessage(err, "wrong decode data")

@@ -1,6 +1,7 @@
 package gobtcsign
 
 import (
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -156,4 +157,15 @@ func (param *CustomParam) GetInputList() []*VerifyTxInputParam {
 		})
 	}
 	return inputList
+}
+
+func (param *CustomParam) GetFee() btcutil.Amount {
+	var sum int64
+	for _, v := range param.VinList {
+		sum += v.Amount
+	}
+	for _, v := range param.OutList {
+		sum -= v.Amount
+	}
+	return btcutil.Amount(sum)
 }
