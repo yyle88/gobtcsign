@@ -3,43 +3,35 @@ package gobtcsign
 import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/yyle88/gobtcsign/dogecoin"
 )
 
-type DustFeeConfig struct {
+type DustFee struct {
 	SoftDustLimit btcutil.Amount
 	ExtraDustsFee btcutil.Amount
 }
 
-func NewDustFeeConfig() DustFeeConfig {
-	return DustFeeConfig{
+func NewDustFee() DustFee {
+	return DustFee{
 		SoftDustLimit: 0,
 		ExtraDustsFee: 0,
 	}
 }
 
-func NewDogeDustFeeConfig() DustFeeConfig {
-	return DustFeeConfig{
-		SoftDustLimit: dogecoin.ChainSoftDustLimit,
-		ExtraDustsFee: dogecoin.ChainExtraDustsFee,
-	}
-}
-
-func (dfc *DustFeeConfig) GetSoftDustSize(txOuts []*wire.TxOut) int64 {
-	var amount = int64(dfc.SoftDustLimit)
-	if amount == 0 {
+func (D *DustFee) CountDustsOutNum(txOuts []*wire.TxOut) int64 {
+	var dustLimit = int64(D.SoftDustLimit)
+	if dustLimit == 0 {
 		return 0
 	}
 
-	var n int64
-	for _, x := range txOuts {
-		if x.Value < amount {
-			n++
+	var count int64
+	for _, out := range txOuts {
+		if out.Value < dustLimit {
+			count++
 		}
 	}
-	return n
+	return count
 }
 
-func (dfc *DustFeeConfig) GetSoftDustsFee(txOuts []*wire.TxOut) btcutil.Amount {
-	return btcutil.Amount(dfc.GetSoftDustSize(txOuts) * int64(dfc.ExtraDustsFee))
+func (D *DustFee) SumExtraDustsFee(txOuts []*wire.TxOut) btcutil.Amount {
+	return btcutil.Amount(D.CountDustsOutNum(txOuts) * int64(D.ExtraDustsFee))
 }
