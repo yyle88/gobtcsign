@@ -27,25 +27,25 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 				Sender: AddressTuple{ //这里是 address 或 pkScript 任填1个都行，这里示范填公钥脚本的情况
 					PkScript: pkScript,
 				},
-				Amount:  49921868563,    //在已经确定utxo的来源hash和位置序号以后这里的数量其实是非必要的，但在某些格式的签名中是需要的
-				RBFInfo: NewRBFNotUse(), //这里不使用 RBF 机制，这个是控制单个utxo的
+				Amount:  49921868563,     //在已经确定utxo的来源hash和位置序号以后这里的数量其实是非必要的，但在某些格式的签名中是需要的
+				RBFInfo: *NewRBFNotUse(), //这里不使用 RBF 机制，这个是控制单个utxo的
 			},
 		},
 		OutList: []OutType{
 			{
 				//这里是 address 或 pkScript 任填1个都行，这里示范填地址的情况
-				Target: NewAddressTuple("nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa"),
+				Target: *NewAddressTuple("nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa"),
 				//发送数量
 				Amount: 6547487,
 			},
 			{
 				//这里是 address 或 pkScript 任填1个都行，这里示范填地址的情况
-				Target: NewAddressTuple("nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP"),
+				Target: *NewAddressTuple("nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP"),
 				//找零数量
 				Amount: 49914980576,
 			},
 		},
-		RBFInfo: NewRBFActive(), //这里使用 RBF 机制，这个是控制全部 utxo 的，优先级在单个utxo的后面
+		RBFInfo: *NewRBFActive(), //这里使用 RBF 机制，这个是控制全部 utxo 的，优先级在单个utxo的后面
 	}
 
 	res, err := customParam.GetSignParam(&netParams)

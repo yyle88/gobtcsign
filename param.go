@@ -43,8 +43,8 @@ type AddressTuple struct {
 	PkScript []byte //公钥脚本 和 钱包地址 二选一填写即可 PkScript（Public Key Script）在拼装交易和签名时使用
 }
 
-func NewAddressTuple(address string) AddressTuple {
-	return AddressTuple{
+func NewAddressTuple(address string) *AddressTuple {
+	return &AddressTuple{
 		Address:  address,
 		PkScript: nil, //这里 address 和 pk-script 是二选一的，因此不设，在后续的逻辑里会根据地址获得 pk-script 信息
 	}
@@ -63,15 +63,15 @@ type RBFConfig struct {
 	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
 }
 
-func NewRBFActive() RBFConfig {
-	return RBFConfig{
+func NewRBFActive() *RBFConfig {
+	return &RBFConfig{
 		AllowRBF: true,
 		Sequence: wire.MaxTxInSequenceNum - 2, // recommended sequence BTC推荐的默认启用RBF的就是这个数
 	}
 }
 
-func NewRBFNotUse() RBFConfig {
-	return RBFConfig{
+func NewRBFNotUse() *RBFConfig {
+	return &RBFConfig{
 		AllowRBF: false, //当两个元素都为零值时表示不启用RBF机制
 		Sequence: 0,     //当两个元素都为零值时表示不启用RBF机制
 	}
