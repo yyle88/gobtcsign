@@ -2,6 +2,7 @@ package gobtcsign
 
 import (
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/pkg/errors"
 )
@@ -20,14 +21,33 @@ type VinType struct {
 	RBFInfo  RBFConfig     //还是RBF机制，前面的是控制整个交易的，这里控制单个UTXO的
 }
 
+func MustNewOutPoint(srcTxHash string, utxoIndex uint32) *wire.OutPoint {
+	//which tx the utxo from.
+	utxoHash, err := chainhash.NewHashFromStr(srcTxHash)
+	if err != nil {
+		panic(errors.WithMessagef(err, "wrong param utxo-from-tx-hash=%s", srcTxHash))
+	}
+	return wire.NewOutPoint(
+		utxoHash,  //这个是收到 utxo 的交易哈希，即 utxo 是从哪里来的，配合位置索引序号构成唯一索引，就能确定是花的哪个utxo
+		utxoIndex, //这个是收到 utxo 的输出位置，比如一个交易中有多个输出，这里要选择输出的位置
+	)
+}
+
 type OutType struct {
 	Target AddressTuple //接收者信息，钱包地址和公钥文本，二选一填写即可
 	Amount int64        //聪的数量
 }
 
 type AddressTuple struct {
-	Address  string //钱包地址，和 公钥文本 二选一填写即可
-	PkScript []byte //PkScript（Public Key Script，公钥脚本），和 钱包地址 二选一填写即可
+	Address  string //钱包地址 和 公钥脚本 二选一填写即可
+	PkScript []byte //公钥脚本 和 钱包地址 二选一填写即可 PkScript（Public Key Script）在拼装交易和签名时使用
+}
+
+func NewAddressTuple(address string) AddressTuple {
+	return AddressTuple{
+		Address:  address,
+		PkScript: nil, //这里 address 和 pk-script 是二选一的，因此不设，在后续的逻辑里会根据地址获得 pk-script 信息
+	}
 }
 
 // GetPkScript 获得公钥文本，当公钥文本存在时就用已有的，否则就根据地址计算
@@ -43,11 +63,25 @@ type RBFConfig struct {
 	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
 }
 
+func NewRBFActive() RBFConfig {
+	return RBFConfig{
+		AllowRBF: true,
+		Sequence: wire.MaxTxInSequenceNum - 2, // recommended sequence BTC推荐的默认启用RBF的就是这个数
+	}
+}
+
+func NewRBFNotUse() RBFConfig {
+	return RBFConfig{
+		AllowRBF: false, //当两个元素都为零值时表示不启用RBF机制
+		Sequence: 0,     //当两个元素都为零值时表示不启用RBF机制
+	}
+}
+
 func (cfg *RBFConfig) GetSequence() uint32 {
 	if cfg.AllowRBF || cfg.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
 		return cfg.Sequence
 	}
-	return wire.MaxTxInSequenceNum //默认值
+	return wire.MaxTxInSequenceNum //当两个元素都为零值时表示不启用RBF机制-因此这里使用默认的最大值表示不启用
 }
 
 // GetSignParam 根据用户的输入信息拼接交易

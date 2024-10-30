@@ -3,7 +3,6 @@ package gobtcsign
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
 	"github.com/yyle88/gobtcsign/dogecoin"
@@ -15,45 +14,38 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 	//use testnet in this case
 	netParams := dogecoin.TestNetParams
 
-	//which tx the utxo from.
-	utxoHash, err := chainhash.NewHashFromStr("8a0fb49fe4c407e24c8dd13e74a3398059ea3183082c0ea621a43d3500ee5918")
-	require.NoError(t, err)
-
 	//which address own the utxo. convert to pk-script bytes
 	pkScript := caseGetAddressPkScript(t, "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP", netParams)
 
 	customParam := CustomParam{
 		VinList: []VinType{
 			{
-				OutPoint: *wire.NewOutPoint(
-					utxoHash, //这个是收到utxo的交易哈希，即utxo是从哪里来的，配合位置索引序号构成唯一索引，就能确定是花的哪个utxo
-					1,        //这个是收到utxo的位置，比如一个交易中有多个输出，这里要选择输出的位置
+				OutPoint: *MustNewOutPoint(
+					"8a0fb49fe4c407e24c8dd13e74a3398059ea3183082c0ea621a43d3500ee5918",
+					1,
 				),
-				Sender: AddressTuple{ //这里是 address 或 pkScript 任填1个都行
+				Sender: AddressTuple{ //这里是 address 或 pkScript 任填1个都行，这里示范填公钥脚本的情况
 					PkScript: pkScript,
 				},
-				Amount:  49921868563, //在已经确定utxo的来源hash和位置序号以后这里的数量其实是非必要的，但在某些格式的签名中是需要的
-				RBFInfo: RBFConfig{}, //这里不使用 RBF 机制，这个是控制单个utxo的
+				Amount:  49921868563,    //在已经确定utxo的来源hash和位置序号以后这里的数量其实是非必要的，但在某些格式的签名中是需要的
+				RBFInfo: NewRBFNotUse(), //这里不使用 RBF 机制，这个是控制单个utxo的
 			},
 		},
 		OutList: []OutType{
 			{
-				Target: AddressTuple{ //这里是 address 或 pkScript 任填1个都行
-					Address: "nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa",
-				},
-				Amount: 6547487, //发送数量
+				//这里是 address 或 pkScript 任填1个都行，这里示范填地址的情况
+				Target: NewAddressTuple("nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa"),
+				//发送数量
+				Amount: 6547487,
 			},
 			{
-				Target: AddressTuple{ //这里是 address 或 pkScript 任填1个都行
-					Address: "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP",
-				},
-				Amount: 49914980576, //找零数量
+				//这里是 address 或 pkScript 任填1个都行，这里示范填地址的情况
+				Target: NewAddressTuple("nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP"),
+				//找零数量
+				Amount: 49914980576,
 			},
 		},
-		RBFInfo: RBFConfig{ //这里使用 RBF 机制，这个是控制全部 utxo 的，优先级在单个utxo的后面
-			AllowRBF: true,
-			Sequence: wire.MaxTxInSequenceNum - 2, //默认的RBF机制就是这样的
-		},
+		RBFInfo: NewRBFActive(), //这里使用 RBF 机制，这个是控制全部 utxo 的，优先级在单个utxo的后面
 	}
 
 	res, err := customParam.GetSignParam(&netParams)
