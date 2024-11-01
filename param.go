@@ -88,14 +88,19 @@ func (cfg *RBFConfig) GetSequence() uint32 {
 // GetSignParam 根据用户的输入信息拼接交易
 func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, error) {
 	var msgTx = wire.NewMsgTx(wire.TxVersion)
-	var inputOuts []*wire.TxOut
+
+	//这是发送者和发送数量的列表，很明显，这是需要签名的关键信息，现在只把待签名信息收集起来
+	var inputOuts = make([]*wire.TxOut, 0, len(param.VinList))
 	for _, input := range param.VinList {
 		pkScript, err := input.Sender.GetPkScript(netParams)
 		if err != nil {
 			return nil, errors.WithMessage(err, "wrong sender.address->pk-script")
 		}
 		inputOuts = append(inputOuts, wire.NewTxOut(input.Amount, pkScript))
+	}
 
+	//设置 vin 列表，当然这里拼装交易和签名是分离的，因此这里设置的是未签名的 utxo 信息。注意，这里需要跟前面的待签名信息位置序号相同
+	for _, input := range param.VinList {
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
 		if txIn.Sequence != wire.MaxTxInSequenceNum { //这里做个断言，因为我后面的逻辑都是基于默认值是它而写的，假如默认值不是它就闹乌龙啦
@@ -107,6 +112,8 @@ func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, 
 		}
 		msgTx.AddTxIn(txIn)
 	}
+
+	//设置 vout 列表，这个不需要签名，因此只要把目标地址和数量设置上就行
 	for _, output := range param.OutList {
 		pkScript, err := output.Target.GetPkScript(netParams)
 		if err != nil {
@@ -116,7 +123,7 @@ func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, 
 	}
 	return &SignParam{
 		MsgTx:     msgTx,
-		InputOuts: inputOuts,
+		InputOuts: inputOuts, //这里它和 vin 的数量完全相同，而且位置序号也相同，最终签名时也需要确保位置相同
 		NetParams: netParams,
 	}, nil
 }

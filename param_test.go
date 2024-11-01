@@ -14,8 +14,10 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 	//use testnet in this case
 	netParams := dogecoin.TestNetParams
 
+	const senderAddress = "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP"
+
 	//which address own the utxo. convert to pk-script bytes
-	pkScript := caseGetAddressPkScript(t, "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP", netParams)
+	pkScript := caseGetAddressPkScript(t, senderAddress, netParams)
 
 	customParam := CustomParam{
 		VinList: []VinType{
@@ -40,13 +42,15 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 			},
 			{
 				//这里是 address 或 pkScript 任填1个都行，这里示范填地址的情况
-				Target: *NewAddressTuple("nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP"),
+				Target: *NewAddressTuple(senderAddress),
 				//找零数量
 				Amount: 49914980576,
 			},
 		},
 		RBFInfo: *NewRBFActive(), //这里使用 RBF 机制，这个是控制全部 utxo 的，优先级在单个utxo的后面
 	}
+
+	require.Equal(t, int64(340500), int64(customParam.GetFee()))
 
 	res, err := customParam.GetSignParam(&netParams)
 	require.NoError(t, err)
@@ -56,7 +60,7 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 	require.Len(t, res.InputOuts, 1)
 	require.Equal(t, pkScript, res.InputOuts[0].PkScript)
 
-	t.Log(res.InputOuts) //只包含输入的数量
+	t.Log(len(res.InputOuts)) //只包含输入的数量
 	require.Len(t, res.InputOuts, 1)
 	require.Equal(t, customParam.VinList[0].Amount, res.InputOuts[0].Value)
 
@@ -70,5 +74,5 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 	require.Equal(t, int64(6547487), res.MsgTx.TxOut[0].Value)
 	require.Equal(t, caseGetAddressPkScript(t, "nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa", netParams), res.MsgTx.TxOut[0].PkScript)
 	require.Equal(t, int64(49914980576), res.MsgTx.TxOut[1].Value)
-	require.Equal(t, caseGetAddressPkScript(t, "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP", netParams), res.MsgTx.TxOut[1].PkScript)
+	require.Equal(t, caseGetAddressPkScript(t, senderAddress, netParams), res.MsgTx.TxOut[1].PkScript)
 }

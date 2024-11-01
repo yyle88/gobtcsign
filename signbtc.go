@@ -16,7 +16,7 @@ import (
 // SignParam 这是待签名的交易信息，基本上最核心的信息就是这些，通过前面的逻辑能构造出这个结构，通过这个结构即可签名，签名后即可发交易
 type SignParam struct {
 	MsgTx     *wire.MsgTx   // 既是参数也是返回值：输入时签名前的交易，而最终返回也是在这里，会得到签名后的交易
-	InputOuts []*wire.TxOut //这里原本是
+	InputOuts []*wire.TxOut // 在其它的教程里是 pkScripts [][]byte 和 amounts []int64 两个属性，这里合二为一以保持逻辑简洁
 	NetParams *chaincfg.Params
 }
 
@@ -100,10 +100,10 @@ func newPrevOuts(signParam *SignParam) map[wire.OutPoint]*wire.TxOut {
 	// 依然是只需要收集 vin 的信息
 	for idx, txIn := range signParam.MsgTx.TxIn {
 		// 这里从 amounts 和 pkScripts 中创建 TxOut 并映射到对应的 OutPoint
-		prevOuts[txIn.PreviousOutPoint] = &wire.TxOut{
-			PkScript: signParam.InputOuts[idx].PkScript,
-			Value:    signParam.InputOuts[idx].Value,
-		}
+		prevOuts[txIn.PreviousOutPoint] = wire.NewTxOut(
+			signParam.InputOuts[idx].Value,
+			signParam.InputOuts[idx].PkScript,
+		)
 	}
 	return prevOuts
 }
