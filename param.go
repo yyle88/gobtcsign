@@ -88,15 +88,13 @@ func (cfg *RBFConfig) GetSequence() uint32 {
 // GetSignParam 根据用户的输入信息拼接交易
 func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, error) {
 	var msgTx = wire.NewMsgTx(wire.TxVersion)
-	var pkScripts [][]byte
-	var amounts []int64
+	var inputOuts []*wire.TxOut
 	for _, input := range param.VinList {
 		pkScript, err := input.Sender.GetPkScript(netParams)
 		if err != nil {
 			return nil, errors.WithMessage(err, "wrong sender.address->pk-script")
 		}
-		pkScripts = append(pkScripts, pkScript)
-		amounts = append(amounts, input.Amount)
+		inputOuts = append(inputOuts, wire.NewTxOut(input.Amount, pkScript))
 
 		utxo := input.OutPoint
 		txIn := wire.NewTxIn(wire.NewOutPoint(&utxo.Hash, uint32(utxo.Index)), nil, nil)
@@ -118,8 +116,7 @@ func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, 
 	}
 	return &SignParam{
 		MsgTx:     msgTx,
-		PkScripts: pkScripts,
-		Amounts:   amounts,
+		InputOuts: inputOuts,
 		NetParams: netParams,
 	}, nil
 }

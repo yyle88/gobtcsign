@@ -15,9 +15,8 @@ import (
 
 // SignParam 这是待签名的交易信息，基本上最核心的信息就是这些，通过前面的逻辑能构造出这个结构，通过这个结构即可签名，签名后即可发交易
 type SignParam struct {
-	MsgTx     *wire.MsgTx // 既是参数也是返回值：输入时签名前的交易，而最终返回也是在这里，会得到签名后的交易
-	PkScripts [][]byte
-	Amounts   []int64
+	MsgTx     *wire.MsgTx   // 既是参数也是返回值：输入时签名前的交易，而最终返回也是在这里，会得到签名后的交易
+	InputOuts []*wire.TxOut //这里原本是
 	NetParams *chaincfg.Params
 }
 
@@ -61,19 +60,11 @@ func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
 	var (
 		msgTx     = signParam.MsgTx
-		pkScripts = signParam.PkScripts
-		amounts   = signParam.Amounts
+		inputOuts = signParam.InputOuts
 	)
 
 	// 创建并填充 prevOuts（前置输出映射）
-	var prevOuts = make(map[wire.OutPoint]*wire.TxOut, len(amounts))
-	for idx, txIn := range msgTx.TxIn {
-		// 这里从 amounts 和 pkScripts 中创建 TxOut 并映射到对应的 OutPoint
-		prevOuts[txIn.PreviousOutPoint] = &wire.TxOut{
-			PkScript: pkScripts[idx],
-			Value:    amounts[idx],
-		}
-	}
+	prevOuts := newPrevOuts(signParam)
 
 	// 使用 prevOuts 初始化一个多前置输出提取器
 	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
@@ -84,7 +75,7 @@ func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 	// 接下来可以继续使用 sigHashes 进行签名
 	for idx := range msgTx.TxIn {
 		// 计算见证 P2WPKH 地址，通常使用压缩公钥
-		witness, err := txscript.WitnessSignature(msgTx, sigHashes, idx, amounts[idx], pkScripts[idx], txscript.SigHashAll, privKey, compress)
+		witness, err := txscript.WitnessSignature(msgTx, sigHashes, idx, inputOuts[idx].Value, inputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
 		if err != nil {
 			return errors.WithMessage(err, "witness_signature is wrong")
 		}
@@ -92,7 +83,7 @@ func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 		msgTx.TxIn[idx].Witness = witness
 	}
 	for idx := range msgTx.TxIn {
-		vm, err := txscript.NewEngine(pkScripts[idx], msgTx, idx, txscript.StandardVerifyFlags, nil, sigHashes, amounts[idx], prevOutFetcher)
+		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, nil, sigHashes, inputOuts[idx].Value, prevOutFetcher)
 		if err != nil {
 			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
 		}
@@ -101,6 +92,20 @@ func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 		}
 	}
 	return nil
+}
+
+// 创建和填充 prevOuts（前置输出映射）
+func newPrevOuts(signParam *SignParam) map[wire.OutPoint]*wire.TxOut {
+	var prevOuts = make(map[wire.OutPoint]*wire.TxOut, len(signParam.MsgTx.TxIn))
+	// 依然是只需要收集 vin 的信息
+	for idx, txIn := range signParam.MsgTx.TxIn {
+		// 这里从 amounts 和 pkScripts 中创建 TxOut 并映射到对应的 OutPoint
+		prevOuts[txIn.PreviousOutPoint] = &wire.TxOut{
+			PkScript: signParam.InputOuts[idx].PkScript,
+			Value:    signParam.InputOuts[idx].Value,
+		}
+	}
+	return prevOuts
 }
 
 func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.PublicKey, senderAddress string) (bool, error) {
@@ -126,25 +131,24 @@ func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.Pub
 func SignP2PKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
 	var (
 		msgTx     = signParam.MsgTx
-		pkScripts = signParam.PkScripts
-		amounts   = signParam.Amounts
+		inputOuts = signParam.InputOuts
 	)
 
 	for idx := range msgTx.TxIn {
 		// 使用私钥对交易输入进行签名
 		// 在大多数情况下，使用压缩公钥是可以接受的，并且更常见。压缩公钥可以减小交易的大小，从而降低交易费用，并且在大多数情况下，与非压缩公钥相比，安全性没有明显的区别
-		signatureScript, err := txscript.SignatureScript(msgTx, idx, pkScripts[idx], txscript.SigHashAll, privKey, compress)
+		signatureScript, err := txscript.SignatureScript(msgTx, idx, inputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
 		if err != nil {
 			return errors.Errorf("wrong signature_script. index=%d error=%v", idx, err)
 		}
 		msgTx.TxIn[idx].SignatureScript = signatureScript
 	}
-	return VerifyP2PKHSign(msgTx, pkScripts, amounts)
+	return VerifyP2PKHSign(msgTx, inputOuts)
 }
 
-func VerifyP2PKHSign(msgTx *wire.MsgTx, pkScripts [][]byte, amounts []int64) error {
+func VerifyP2PKHSign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut) error {
 	for idx := range msgTx.TxIn { // 这段代码的作用是创建和执行脚本引擎，用于验证指定的脚本是否有效。如果脚本验证失败，则返回错误信息。这在比特币交易的验证过程中非常重要，以确保交易的合法性和安全性。
-		vm, err := txscript.NewEngine(pkScripts[idx], msgTx, idx, txscript.StandardVerifyFlags, nil, nil, amounts[idx], nil)
+		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, nil, nil, inputOuts[idx].Value, nil)
 		if err != nil {
 			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
 		}

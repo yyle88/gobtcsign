@@ -72,7 +72,7 @@ func TestSignBTC(t *testing.T) {
 	signParam, err := param.GetSignParam(&netParam)
 	require.NoError(t, err)
 
-	t.Log(signParam.Amounts)
+	t.Log(len(signParam.InputOuts))
 
 	//签名
 	require.NoError(t, gobtcsign.Sign(senderAddress, privateKeyHex, signParam))

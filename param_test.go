@@ -52,13 +52,13 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, res.NetParams.Net, netParams.Net)
 
-	t.Log(len(res.PkScripts)) //只包含输入的数据
-	require.Len(t, res.PkScripts, 1)
-	require.Equal(t, pkScript, res.PkScripts[0])
+	t.Log(len(res.InputOuts)) //只包含输入的数据
+	require.Len(t, res.InputOuts, 1)
+	require.Equal(t, pkScript, res.InputOuts[0].PkScript)
 
-	t.Log(res.Amounts) //只包含输入的数量
-	require.Len(t, res.Amounts, 1)
-	require.Equal(t, customParam.VinList[0].Amount, res.Amounts[0])
+	t.Log(res.InputOuts) //只包含输入的数量
+	require.Len(t, res.InputOuts, 1)
+	require.Equal(t, customParam.VinList[0].Amount, res.InputOuts[0].Value)
 
 	require.Len(t, res.MsgTx.TxIn, 1)
 	require.Equal(t, "8a0fb49fe4c407e24c8dd13e74a3398059ea3183082c0ea621a43d3500ee5918", res.MsgTx.TxIn[0].PreviousOutPoint.Hash.String())

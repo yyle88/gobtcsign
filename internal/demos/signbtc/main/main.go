@@ -43,7 +43,7 @@ func main() {
 	signParam, err := param.GetSignParam(&netParams)
 	utils.MustDone(err)
 
-	fmt.Println(signParam.Amounts)
+	fmt.Println(len(signParam.InputOuts))
 
 	//签名
 	utils.MustDone(gobtcsign.Sign(senderAddress, privateKeyHex, signParam))
