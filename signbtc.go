@@ -37,6 +37,11 @@ func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 	//开发者需要知道这是，这里有4～5种类型，各有各的签名规则
 	//这里只提供有限的几种签名规则，而不是全部
 	switch address := walletAddress; address.(type) {
+	case *btcutil.AddressWitnessPubKeyHash: //txscript.WitnessV0PubKeyHashTy的常量
+		//这里使用压缩的地址，而不支持不压缩的
+		if err := signP2WPKH(param, privKey, true); err != nil {
+			return errors.WithMessage(err, "wrong sign")
+		}
 	case *btcutil.AddressPubKeyHash: //请参考 txscript.PubKeyHashTy 的签名逻辑
 		//检查钱包的地址是不是压缩的，有压缩和不压缩两种格式的地址，都是可以用的
 		compress, err := CheckPKHAddressIsCompress(param.NetParams, pubKey, senderAddress)
@@ -49,6 +54,51 @@ func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 		}
 	default: //其它钱包类型暂不支持
 		return errors.Errorf("From地址 %s 属于 %s 类型, 类型错误", address, reflect.TypeOf(address).String()) //倒是没必要支持太多的类型
+	}
+	return nil
+}
+
+func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
+	var (
+		msgTx     = signParam.MsgTx
+		pkScripts = signParam.PkScripts
+		amounts   = signParam.Amounts
+	)
+
+	// 创建并填充 prevOuts（前置输出映射）
+	var prevOuts = make(map[wire.OutPoint]*wire.TxOut, len(amounts))
+	for idx, txIn := range msgTx.TxIn {
+		// 这里从 amounts 和 pkScripts 中创建 TxOut 并映射到对应的 OutPoint
+		prevOuts[txIn.PreviousOutPoint] = &wire.TxOut{
+			PkScript: pkScripts[idx],
+			Value:    amounts[idx],
+		}
+	}
+
+	// 使用 prevOuts 初始化一个多前置输出提取器
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
+
+	// 即可生成交易签名哈希
+	sigHashes := txscript.NewTxSigHashes(msgTx, prevOutFetcher)
+
+	// 接下来可以继续使用 sigHashes 进行签名
+	for idx := range msgTx.TxIn {
+		// 计算见证 P2WPKH 地址，通常使用压缩公钥
+		witness, err := txscript.WitnessSignature(msgTx, sigHashes, idx, amounts[idx], pkScripts[idx], txscript.SigHashAll, privKey, compress)
+		if err != nil {
+			return errors.WithMessage(err, "witness_signature is wrong")
+		}
+		// 设置见证
+		msgTx.TxIn[idx].Witness = witness
+	}
+	for idx := range msgTx.TxIn {
+		vm, err := txscript.NewEngine(pkScripts[idx], msgTx, idx, txscript.StandardVerifyFlags, nil, sigHashes, amounts[idx], prevOutFetcher)
+		if err != nil {
+			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
+		}
+		if err = vm.Execute(); err != nil {
+			return errors.Errorf("wrong vm execute. index=%d error=%v", idx, err)
+		}
 	}
 	return nil
 }
