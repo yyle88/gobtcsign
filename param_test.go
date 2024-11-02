@@ -17,7 +17,7 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 	const senderAddress = "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP"
 
 	//which address own the utxo. convert to pk-script bytes
-	pkScript := caseGetAddressPkScript(t, senderAddress, netParams)
+	pkScript := caseGetAddressPkScript(t, senderAddress, &netParams)
 
 	customParam := CustomParam{
 		VinList: []VinType{
@@ -72,7 +72,7 @@ func TestCustomParam_GetSignParam(t *testing.T) {
 
 	require.Len(t, res.MsgTx.TxOut, 2)
 	require.Equal(t, int64(6547487), res.MsgTx.TxOut[0].Value)
-	require.Equal(t, caseGetAddressPkScript(t, "nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa", netParams), res.MsgTx.TxOut[0].PkScript)
+	require.Equal(t, caseGetAddressPkScript(t, "nqNjvWut21qMKyZb4EPWBEUuVDSHuypVUa", &netParams), res.MsgTx.TxOut[0].PkScript)
 	require.Equal(t, int64(49914980576), res.MsgTx.TxOut[1].Value)
-	require.Equal(t, caseGetAddressPkScript(t, senderAddress, netParams), res.MsgTx.TxOut[1].PkScript)
+	require.Equal(t, caseGetAddressPkScript(t, senderAddress, &netParams), res.MsgTx.TxOut[1].PkScript)
 }

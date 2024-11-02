@@ -46,7 +46,7 @@ func TestIsDustOutputBtc(t *testing.T) {
 
 func TestGetAddressPkScript(t *testing.T) {
 	netParams := dogecoin.TestNetParams
-	pkScript := caseGetAddressPkScript(t, "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP", netParams)
+	pkScript := caseGetAddressPkScript(t, "nXMSrjEQXUJ77TQSeErpJMySy3kfSfwSCP", &netParams)
 
 	// 这里写个简单的比较逻辑
 	pkTarget, err := base64.StdEncoding.DecodeString("dqkUIqn5GrQ9r5dmyzOQ/RTb+qkqVQqIrA==")
@@ -54,8 +54,16 @@ func TestGetAddressPkScript(t *testing.T) {
 	require.Equal(t, pkTarget, pkScript)
 }
 
-func caseGetAddressPkScript(t *testing.T, rawAddress string, netParams chaincfg.Params) []byte {
-	pkScript, err := GetAddressPkScript(rawAddress, &netParams)
+func caseGetAddressPkScript(t *testing.T, rawAddress string, netParams *chaincfg.Params) []byte {
+	pkScript, err := GetAddressPkScript(rawAddress, netParams)
 	require.NoError(t, err)
 	return pkScript
+}
+
+func TestNewInputOuts(t *testing.T) {
+	netParams := chaincfg.MainNetParams
+	pkScript, err := GetAddressPkScript("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", &netParams)
+	require.NoError(t, err)
+	outs := NewInputOuts([][]byte{pkScript, pkScript}, []int64{1234, 5678})
+	require.Equal(t, 2, len(outs))
 }

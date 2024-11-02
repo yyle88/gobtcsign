@@ -88,3 +88,15 @@ func IsDustOutputDoge(amount int64, dustLimitCoin float64) (bool, error) {
 	}
 	return false, nil
 }
+
+// NewInputOuts 因为 SignParam 的成员里有 []*wire.TxOut 类型的前置输出字段
+// 但教程常用的是 pkScripts [][]byte 和 amounts []int64 两个属性
+// 因此这里写个转换逻辑
+func NewInputOuts(pkScripts [][]byte, amounts []int64) []*wire.TxOut {
+	size := max(len(pkScripts), len(amounts)) // must same size. so use the max size
+	outs := make([]*wire.TxOut, 0, size)
+	for idx := 0; idx < size; idx++ {
+		outs = append(outs, wire.NewTxOut(amounts[idx], pkScripts[idx]))
+	}
+	return outs
+}
