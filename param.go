@@ -54,9 +54,9 @@ func NewAddressTuple(address string) *AddressTuple {
 // GetPkScript 获得公钥文本，当公钥文本存在时就用已有的，否则就根据地址计算
 func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error) {
 	if len(one.PkScript) > 0 {
-		return one.PkScript, nil
+		return one.PkScript, nil //假如有就直接返回，否则就根据地址计算
 	}
-	return GetAddressPkScript(one.Address, netParams)
+	return GetAddressPkScript(one.Address, netParams) //这里不用做缓存避免增加复杂度
 }
 
 type RBFConfig struct {

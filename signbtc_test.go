@@ -13,7 +13,7 @@ func TestSignBTC(t *testing.T) {
 	const senderAddress = "tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap"
 	const privateKeyHex = "54bb1426611226077889d63c65f4f1fa212bcb42c2141c81e0c5409324711092" //注意不要暴露私钥，除非准备放弃这个钱包
 
-	netParam := chaincfg.TestNet3Params
+	netParams := chaincfg.TestNet3Params
 
 	param := gobtcsign.CustomParam{
 		VinList: []gobtcsign.VinType{
@@ -69,7 +69,7 @@ func TestSignBTC(t *testing.T) {
 	require.Equal(t, int64(23456), int64(param.GetFee()))
 
 	//得到待签名的交易
-	signParam, err := param.GetSignParam(&netParam)
+	signParam, err := param.GetSignParam(&netParams)
 	require.NoError(t, err)
 
 	t.Log(len(signParam.InputOuts))
@@ -81,9 +81,9 @@ func TestSignBTC(t *testing.T) {
 	msgTx := signParam.MsgTx
 
 	//验证签名
-	require.NoError(t, gobtcsign.VerifyP2PKHSignV2(msgTx, param.GetInputList(), &netParam))
+	require.NoError(t, gobtcsign.VerifyP2PKHSignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
-	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParam))
+	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
 
 	//获得交易哈希
 	txHash := gobtcsign.GetTxHash(msgTx)
@@ -106,7 +106,7 @@ func TestSignDOGE(t *testing.T) {
 	const senderAddress = "nkgVWbNrUowCG4mkWSzA7HHUDe3XyL2NaC"
 	const privateKeyHex = "5f397bc72377b75db7b008a9c3fcd71651bfb138d6fc2458bb0279b9cfc8442a" //注意不要暴露私钥，除非准备放弃这个钱包
 
-	netParam := dogecoin.TestNetParams
+	netParams := dogecoin.TestNetParams
 
 	param := gobtcsign.CustomParam{
 		VinList: []gobtcsign.VinType{
@@ -148,7 +148,7 @@ func TestSignDOGE(t *testing.T) {
 	require.Equal(t, int64(345678), int64(param.GetFee()))
 
 	//得到待签名的交易
-	signParam, err := param.GetSignParam(&netParam)
+	signParam, err := param.GetSignParam(&netParams)
 	require.NoError(t, err)
 
 	//签名
@@ -158,9 +158,9 @@ func TestSignDOGE(t *testing.T) {
 	msgTx := signParam.MsgTx
 
 	//验证签名
-	require.NoError(t, gobtcsign.VerifyP2PKHSignV2(msgTx, param.GetInputList(), &netParam))
+	require.NoError(t, gobtcsign.VerifyP2PKHSignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
-	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParam))
+	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
 
 	//获得交易哈希
 	txHash := gobtcsign.GetTxHash(msgTx)

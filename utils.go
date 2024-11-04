@@ -50,13 +50,29 @@ func NewMsgTxFromHex(txHex string) (*wire.MsgTx, error) {
 func GetAddressPkScript(addressString string, netParams *chaincfg.Params) ([]byte, error) {
 	address, err := btcutil.DecodeAddress(addressString, netParams)
 	if err != nil {
-		return nil, errors.WithMessage(err, "wrong encrypt.decode_address")
+		return nil, errors.WithMessage(err, "wrong decode-address")
 	}
 	pkScript, err := txscript.PayToAddrScript(address)
 	if err != nil {
-		return nil, errors.WithMessage(err, "wrong encrypt.pay_to_addr_script")
+		return nil, errors.WithMessage(err, "wrong get-pk-script")
 	}
 	return pkScript, nil
+}
+
+func MustNewAddress(addressString string, netParams *chaincfg.Params) btcutil.Address {
+	address, err := btcutil.DecodeAddress(addressString, netParams)
+	if err != nil {
+		panic(errors.WithMessage(err, "wrong decode-address"))
+	}
+	return address
+}
+
+func MustGetPkScript(address btcutil.Address) []byte {
+	pkScript, err := txscript.PayToAddrScript(address)
+	if err != nil {
+		panic(errors.WithMessage(err, "wrong get-pk-script"))
+	}
+	return pkScript
 }
 
 // IsDustOutputBtc 检查是不是灰尘输出，链不允许灰尘输出，避免到处都是粉尘
