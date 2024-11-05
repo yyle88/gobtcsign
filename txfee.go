@@ -92,6 +92,10 @@ type ChangeTo struct {
 	AddressX btcutil.Address //允许为空，当两者皆为空时表示没有找零输出
 }
 
+func NewNoChange() *ChangeTo {
+	return &ChangeTo{}
+}
+
 func (T *ChangeTo) GetChangeScriptSize() (int, error) {
 	if T.PkScript != nil { //优先使用找零脚本进行计算
 		return CalculateChangePkScriptSize(T.PkScript)

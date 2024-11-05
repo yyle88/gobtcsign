@@ -49,7 +49,7 @@ func TestEstimateTxSize(t *testing.T) {
 		RBFInfo: *NewRBFActive(),
 	}
 
-	size, err := EstimateTxSize(param, &netParams, &ChangeTo{})
+	size, err := EstimateTxSize(param, &netParams, NewNoChange())
 	require.NoError(t, err)
 
 	t.Log("estimate-tx-size:", size)
@@ -98,7 +98,7 @@ func TestEstimateTxSize_VIN_1_P2PKH(t *testing.T) {
 		RBFInfo: *NewRBFActive(),
 	}
 
-	size, err := EstimateTxSize(param, &netParams, &ChangeTo{})
+	size, err := EstimateTxSize(param, &netParams, NewNoChange())
 	require.NoError(t, err)
 
 	t.Log("estimate-tx-size:", size)
@@ -158,7 +158,7 @@ func TestEstimateTxFee(t *testing.T) {
 	t.Log(txFee) //这里打印出来单位是BTC，但实际是DOGE，但是不用在意这些细节
 	require.Equal(t, btcutil.Amount(787500), txFee)
 
-	changeAmount := param.GetFee() - txFee
+	changeAmount := param.GetChangeAmountWithFee(txFee)
 	t.Log(changeAmount)
 	require.Equal(t, btcutil.Amount(1212500), changeAmount)
 

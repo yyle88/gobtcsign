@@ -175,6 +175,7 @@ func (param *CustomParam) GetInputList() []*VerifyTxInputParam {
 	return inputList
 }
 
+// GetFee 全部输入和全部输出的差额，即交易的费用
 func (param *CustomParam) GetFee() btcutil.Amount {
 	var sum int64
 	for _, v := range param.VinList {
@@ -184,6 +185,11 @@ func (param *CustomParam) GetFee() btcutil.Amount {
 		sum -= v.Amount
 	}
 	return btcutil.Amount(sum)
+}
+
+// GetChangeAmountWithFee 根据交易费用计算出找零数量
+func (param *CustomParam) GetChangeAmountWithFee(fee btcutil.Amount) btcutil.Amount {
+	return param.GetFee() - fee
 }
 
 func (param *CustomParam) EstimateTxSize(netParams *chaincfg.Params, change *ChangeTo) (int, error) {
