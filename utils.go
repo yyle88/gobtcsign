@@ -3,6 +3,7 @@ package gobtcsign
 import (
 	"bytes"
 	"encoding/hex"
+	"math"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -115,4 +116,9 @@ func NewInputOuts(pkScripts [][]byte, amounts []int64) []*wire.TxOut {
 		outs = append(outs, wire.NewTxOut(amounts[idx], pkScripts[idx]))
 	}
 	return outs
+}
+
+// GetMsgTxVSize 获得【签名后的】交易的大小，结果是 v-size 的，而且和链上的值相同
+func GetMsgTxVSize(msgTx *wire.MsgTx) int {
+	return int(math.Ceil(float64(3*msgTx.SerializeSizeStripped()+msgTx.SerializeSize()) / 4))
 }

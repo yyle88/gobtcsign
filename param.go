@@ -128,6 +128,18 @@ func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, 
 	}, nil
 }
 
+func (param *CustomParam) GetOutputs(netParams *chaincfg.Params) ([]*wire.TxOut, error) {
+	outputs := make([]*wire.TxOut, 0, len(param.OutList))
+	for _, output := range param.OutList {
+		pkScript, err := output.Target.GetPkScript(netParams)
+		if err != nil {
+			return nil, errors.WithMessage(err, "wrong target.address->pk-script")
+		}
+		outputs = append(outputs, wire.NewTxOut(output.Amount, pkScript))
+	}
+	return outputs, nil
+}
+
 func (param *CustomParam) GetTxInSequenceNum(input VinType) uint32 {
 	// 当你确实是需要对每个交易单独设置RBF时，就可以在这里设置，单独设置到这个 vin 里面
 	if seqNo := input.RBFInfo.GetSequence(); seqNo != wire.MaxTxInSequenceNum { //启用RBF机制，精确的RBF逻辑
@@ -172,4 +184,12 @@ func (param *CustomParam) GetFee() btcutil.Amount {
 		sum -= v.Amount
 	}
 	return btcutil.Amount(sum)
+}
+
+func (param *CustomParam) EstimateTxSize(netParams *chaincfg.Params, change *ChangeTo) (int, error) {
+	return EstimateTxSize(param, netParams, change)
+}
+
+func (param *CustomParam) EstimateTxFee(netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
+	return EstimateTxFee(param, netParams, change, feeRatePerKb, dustFee)
 }

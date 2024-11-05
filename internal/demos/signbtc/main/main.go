@@ -39,11 +39,15 @@ func main() {
 	//具体费用跟实时费率以及交易体大小有关，因此不同的交易有不同的预估值，这里省去预估的过程
 	utils.MustEquals(int64(11111), int64(param.GetFee()))
 
+	size, err := param.EstimateTxSize(&netParams, &gobtcsign.ChangeTo{})
+	utils.MustDone(err)
+	fmt.Println("estimate-tx-size:", size) //这是预估值 略微 >= 实际值
+
 	//得到待签名的交易
 	signParam, err := param.GetSignParam(&netParams)
 	utils.MustDone(err)
 
-	fmt.Println(len(signParam.InputOuts))
+	fmt.Println("utxo inputs:", len(signParam.InputOuts))
 
 	//签名
 	utils.MustDone(gobtcsign.Sign(senderAddress, privateKeyHex, signParam))

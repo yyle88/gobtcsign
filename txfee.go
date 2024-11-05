@@ -2,6 +2,7 @@ package gobtcsign
 
 import (
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
@@ -16,39 +17,49 @@ func NewDustFee() DustFee {
 	return dusts.NewDustFee() //比特币没有软灰尘收费，这里配置个空的（因为doge里有，这里为了逻辑相通，而给个空的）
 }
 
-// CalculateMsgTxFee 通过未签名且未找零的交易，预估出需要的费用
+// EstimateTxFee 通过未签名且未找零的交易，预估出需要的费用
 // 代码基本是仿照这里的 github.com/btcsuite/btcwallet/wallet/txauthor@v1.3.4/author.go 里面 NewUnsignedTransaction 的逻辑
-// 需要特别注意的是，这里只是个使用的样例
 // 由于是计算手续费的，因为这个交易里不应该包含找零的 output 信息，否则结果是无意义的
-func CalculateMsgTxFee(msgTx *wire.MsgTx, changeAddress btcutil.Address, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
-	maxSignedSize, err := CalculateMsgTxSize(msgTx, changeAddress)
+func EstimateTxFee(param *CustomParam, netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
+	maxSignedSize, err := EstimateTxSize(param, netParams, change)
 	if err != nil {
-		return 0, errors.WithMessage(err, "calculate size is wrong")
+		return 0, errors.WithMessage(err, "wrong estimate-tx-size")
+	}
+	outputs, err := param.GetOutputs(netParams)
+	if err != nil {
+		return 0, errors.WithMessage(err, "wrong get-outputs")
 	}
 	//有的链比如 DOGE_COIN 有软灰尘的概念，软灰尘需要消耗更高的手续费，而且这个手续费是不能协商的，而是必须交的，就得在这里交灰尘费
-	maxRequiredFee := txrules.FeeForSerializeSize(feeRatePerKb, maxSignedSize) + dustFee.SumExtraDustFee(msgTx.TxOut)
+	maxRequiredFee := txrules.FeeForSerializeSize(feeRatePerKb, maxSignedSize) + dustFee.SumExtraDustFee(outputs)
 	//但是请注意，input-output-maxFee 的结果还可能是个软灰尘，这时候就还得再增加找零的软灰尘费用，这个是后续逻辑需要考虑的
 	return maxRequiredFee, nil
 }
 
-// CalculateMsgTxSize 计算交易的预估大小（在最坏情况下的预估大小）
-// 这个函数还是抄的 github.com/btcsuite/btcwallet/wallet/txauthor@v1.3.4/author.go 里面 NewUnsignedTransaction 的逻辑
-// 这个函数也是个样例，主要是演示如何预估大小，当然也是可以直接使用的
-// 这个交易里不应该包含找零信息
-func CalculateMsgTxSize(msgTx *wire.MsgTx, changeAddress btcutil.Address) (int, error) {
-	var scripts = make([][]byte, 0, len(msgTx.TxIn))
-	for _, txIn := range msgTx.TxIn {
-		scripts = append(scripts, txIn.SignatureScript)
+// EstimateTxSize 通过未签名的交易，预估出签名后交易体的大小，结果是 v-size 的，而且略微>=实际值
+func EstimateTxSize(param *CustomParam, netParams *chaincfg.Params, change *ChangeTo) (int, error) {
+	var scripts = make([][]byte, 0, len(param.VinList))
+	for _, txIn := range param.VinList {
+		pkScript, err := txIn.Sender.GetPkScript(netParams)
+		if err != nil {
+			return 0, errors.WithMessage(err, "wrong get-pk-script")
+		}
+		scripts = append(scripts, pkScript)
 	}
-	return CalculateSize(scripts, msgTx.TxOut, changeAddress)
+	outputs, err := param.GetOutputs(netParams)
+	if err != nil {
+		return 0, errors.WithMessage(err, "wrong get-outputs")
+	}
+	return EstimateSize(scripts, outputs, change)
 }
 
-// CalculateSize 计算交易的预估大小（在最坏情况下的预估大小）
-// 这个函数的参数详见前面函数的调用
-func CalculateSize(scripts [][]byte, outputs []*wire.TxOut, changeAddress btcutil.Address) (int, error) {
-	changeScriptSize, err := CalculateChangeAddressSize(changeAddress)
+// EstimateSize 计算交易的预估大小（在最坏情况下的预估大小）
+// 这个函数还是抄的 github.com/btcsuite/btcwallet/wallet/txauthor@v1.3.4/author.go 里面 NewUnsignedTransaction 的逻辑
+// 详细细节见 https://github.com/btcsuite/btcwallet/blob/master/wallet/txauthor/author.go 这里的逻辑
+// 是否填写找零信息，得依据 outputs 里面是否已经包含找零信息
+func EstimateSize(scripts [][]byte, outputs []*wire.TxOut, change *ChangeTo) (int, error) {
+	changeScriptSize, err := change.GetChangeScriptSize()
 	if err != nil {
-		return 0, errors.WithMessage(err, "calculate change script size")
+		return 0, errors.WithMessage(err, "wrong calculate-change-script-size")
 	}
 
 	// We count the types of inputs, which we'll use to estimate
@@ -76,20 +87,39 @@ func CalculateSize(scripts [][]byte, outputs []*wire.TxOut, changeAddress btcuti
 	return maxSignedSize, nil
 }
 
+type ChangeTo struct {
+	PkScript []byte          //允许为空，当两者皆为空时表示没有找零输出
+	AddressX btcutil.Address //允许为空，当两者皆为空时表示没有找零输出
+}
+
+func (T *ChangeTo) GetChangeScriptSize() (int, error) {
+	if T.PkScript != nil { //优先使用找零脚本进行计算
+		return CalculateChangePkScriptSize(T.PkScript)
+	}
+	if T.AddressX != nil { //其次使用找零地址进行计算
+		return CalculateChangeAddressSize(T.AddressX)
+	}
+	return 0, nil //说明不需要找零输出，就返回0
+}
+
 func CalculateChangeAddressSize(address btcutil.Address) (int, error) {
-	script, err := txscript.PayToAddrScript(address)
+	pkScript, err := txscript.PayToAddrScript(address)
 	if err != nil {
 		return 0, errors.WithMessage(err, "wrong change_address")
 	}
+	return CalculateChangePkScriptSize(pkScript)
+}
+
+func CalculateChangePkScriptSize(pkScript []byte) (int, error) {
 	var size int
 	switch {
-	case txscript.IsPayToPubKeyHash(script):
+	case txscript.IsPayToPubKeyHash(pkScript):
 		size = txsizes.P2PKHPkScriptSize
-	case txscript.IsPayToScriptHash(script):
+	case txscript.IsPayToScriptHash(pkScript):
 		size = txsizes.NestedP2WPKHPkScriptSize
-	case txscript.IsPayToWitnessPubKeyHash(script), txscript.IsPayToWitnessScriptHash(script):
+	case txscript.IsPayToWitnessPubKeyHash(pkScript), txscript.IsPayToWitnessScriptHash(pkScript):
 		size = txsizes.P2WPKHPkScriptSize
-	case txscript.IsPayToTaproot(script):
+	case txscript.IsPayToTaproot(pkScript):
 		size = txsizes.P2TRPkScriptSize
 	default:
 		return 0, errors.New("UNSUPPORTED ADDRESS TYPE")
