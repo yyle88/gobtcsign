@@ -57,7 +57,7 @@ func main() {
 	msgTx := signParam.MsgTx
 
 	//验证签名
-	utils.MustDone(gobtcsign.VerifyP2PKHSignV2(msgTx, param.GetInputList(), &netParams))
+	utils.MustDone(gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
 	utils.MustDone(gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
 

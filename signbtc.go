@@ -38,7 +38,7 @@ func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 	switch address := walletAddress; address.(type) {
 	case *btcutil.AddressWitnessPubKeyHash: //txscript.WitnessV0PubKeyHashTy的常量
 		//这里使用压缩的地址，而不支持不压缩的
-		if err := signP2WPKH(param, privKey, true); err != nil {
+		if err := SignP2WPKH(param, privKey, true); err != nil {
 			return errors.WithMessage(err, "wrong sign")
 		}
 	case *btcutil.AddressPubKeyHash: //请参考 txscript.PubKeyHashTy 的签名逻辑
@@ -57,11 +57,8 @@ func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 	return nil
 }
 
-func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
-	var (
-		msgTx     = signParam.MsgTx
-		inputOuts = signParam.InputOuts
-	)
+func SignP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
+	var msgTx = signParam.MsgTx // 这里是指针传递，因此这个既是参数也是返回值
 
 	// 创建 prevOuts（前置输出映射） 使用 prevOuts 初始化一个多前置输出提取器
 	prevOutFetcher := txscript.NewMultiPrevOutFetcher(newPrevOutsMap(signParam))
@@ -72,20 +69,20 @@ func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 	// 接下来可以继续使用 sigHashes 进行签名
 	for idx := range msgTx.TxIn {
 		// 计算见证 P2WPKH 地址，通常使用压缩公钥
-		witness, err := txscript.WitnessSignature(msgTx, sigHashes, idx, inputOuts[idx].Value, inputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
+		witness, err := txscript.WitnessSignature(msgTx, sigHashes, idx, signParam.InputOuts[idx].Value, signParam.InputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
 		if err != nil {
 			return errors.WithMessage(err, "witness_signature is wrong")
 		}
 		// 设置见证
 		msgTx.TxIn[idx].Witness = witness
 	}
-	return VerifyP2WPKHSign(msgTx, inputOuts, prevOutFetcher, sigHashes)
+	return VerifySign(msgTx, signParam.InputOuts, prevOutFetcher, sigHashes)
 }
 
-func VerifyP2WPKHSign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut, prevOutFetcher txscript.PrevOutputFetcher, sigHashes *txscript.TxSigHashes) error {
-	sigCache := txscript.NewSigCache(uint(len(inputOuts))) //设置为输入的长度是较好的，当然，更大量的计算时也可使用全局的cache
+func VerifySign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut, prevOutFetcher txscript.PrevOutputFetcher, sigHashes *txscript.TxSigHashes) error {
+	sigCache := txscript.NewSigCache(uint(len(msgTx.TxIn))) //设置为输入的长度是较好的，当然，更大量的计算时也可使用全局的cache
 
-	for idx := range msgTx.TxIn {
+	for idx := range msgTx.TxIn { // 这段代码的作用是创建和执行脚本引擎，用于验证指定的脚本是否有效。如果脚本验证失败，则返回错误信息。这在比特币交易的验证过程中非常重要，以确保交易的合法性和安全性。
 		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, sigCache, sigHashes, inputOuts[idx].Value, prevOutFetcher)
 		if err != nil {
 			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
@@ -132,34 +129,25 @@ func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.Pub
 }
 
 func SignP2PKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) error {
-	var (
-		msgTx     = signParam.MsgTx
-		inputOuts = signParam.InputOuts
-	)
+	var msgTx = signParam.MsgTx // 这里是指针传递，因此这个既是参数也是返回值
 
 	for idx := range msgTx.TxIn {
 		// 使用私钥对交易输入进行签名
 		// 在大多数情况下，使用压缩公钥是可以接受的，并且更常见。压缩公钥可以减小交易的大小，从而降低交易费用，并且在大多数情况下，与非压缩公钥相比，安全性没有明显的区别
-		signatureScript, err := txscript.SignatureScript(msgTx, idx, inputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
+		signatureScript, err := txscript.SignatureScript(msgTx, idx, signParam.InputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
 		if err != nil {
 			return errors.Errorf("wrong signature_script. index=%d error=%v", idx, err)
 		}
 		msgTx.TxIn[idx].SignatureScript = signatureScript
 	}
-	return VerifyP2PKHSign(msgTx, inputOuts)
-}
 
-func VerifyP2PKHSign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut) error {
-	for idx := range msgTx.TxIn { // 这段代码的作用是创建和执行脚本引擎，用于验证指定的脚本是否有效。如果脚本验证失败，则返回错误信息。这在比特币交易的验证过程中非常重要，以确保交易的合法性和安全性。
-		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, nil, nil, inputOuts[idx].Value, nil)
-		if err != nil {
-			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
-		}
-		if err = vm.Execute(); err != nil {
-			return errors.Errorf("wrong vm execute. index=%d error=%v", idx, err)
-		}
-	}
-	return nil
+	// 创建 prevOuts（前置输出映射） 使用 prevOuts 初始化一个多前置输出提取器
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(newPrevOutsMap(signParam))
+
+	// 即可生成交易签名哈希
+	sigHashes := txscript.NewTxSigHashes(msgTx, prevOutFetcher)
+
+	return VerifySign(msgTx, signParam.InputOuts, prevOutFetcher, sigHashes)
 }
 
 // CheckMsgTxSameWithParam 避免签名逻辑修改数量和目标位置

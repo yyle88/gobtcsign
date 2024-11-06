@@ -81,7 +81,7 @@ func TestSignBTC(t *testing.T) {
 	msgTx := signParam.MsgTx
 
 	//验证签名
-	require.NoError(t, gobtcsign.VerifyP2WPKHSignV2(msgTx, param.GetInputList(), &netParams))
+	require.NoError(t, gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
 	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
 
@@ -158,7 +158,7 @@ func TestSignDOGE(t *testing.T) {
 	msgTx := signParam.MsgTx
 
 	//验证签名
-	require.NoError(t, gobtcsign.VerifyP2PKHSignV2(msgTx, param.GetInputList(), &netParams))
+	require.NoError(t, gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
 	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
 

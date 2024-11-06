@@ -15,7 +15,7 @@ func TestVerifyTx_BTC_testnet(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(msgTx.TxHash().String())
 
-	require.NoError(t, VerifyP2WPKHSignV2(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
 		NewVerifyTxInputParam("mtvw738RMLYhgKLShmjK5arHv9NmJSWZ8D", 70784889640),
 	}, &chaincfg.TestNet3Params))
 }
@@ -27,7 +27,7 @@ func TestVerifyTx_BTC_testnet_2(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(msgTx.TxHash().String())
 
-	require.NoError(t, VerifyP2WPKHSignV2(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
 		NewVerifyTxInputParam("n4rQnUNCiBR6mhFFgtzJaMjssDo6QohTEh", 4347958369),
 	}, &chaincfg.TestNet3Params))
 }
@@ -39,7 +39,7 @@ func TestVerifyTx_BTC_testnet_3(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(msgTx.TxHash().String())
 
-	require.NoError(t, VerifyP2WPKHSignV2(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
 		NewVerifyTxInputParam("n4rQnUNCiBR6mhFFgtzJaMjssDo6QohTEh", 4341733718),
 	}, &chaincfg.TestNet3Params))
 }
@@ -51,7 +51,7 @@ func TestVerifyTx_BTC_testnet_4(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(msgTx.TxHash().String())
 
-	require.NoError(t, VerifyP2WPKHSignV2(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
 		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4900),
 		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4320),
 		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4560),
@@ -69,7 +69,7 @@ func TestVerifyTx_DOGE_testnet(t *testing.T) {
 
 	netParams := &dogecoin.TestNetParams
 
-	require.NoError(t, VerifyP2PKHSignV2(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
 		NewVerifyTxInputParam("nhwHQ29uEKnHeiWNLpU2zVHtcrZjaLKaHF", 0), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, netParams))
 }
@@ -83,7 +83,7 @@ func TestVerifyTx_DOGE_mainnet(t *testing.T) {
 
 	netParams := &dogecoin.MainNetParams
 
-	require.NoError(t, VerifyP2PKHSignV2(msgTx, []*VerifyTxInputParam{
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
 		NewVerifyTxInputParam("D6se3Ajq9mF8YD4p7jSXwZxewT6ePsnea6", 0), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, netParams))
 }
@@ -103,7 +103,7 @@ func TestVerifyTx_DOGE_mainnet_2(t *testing.T) {
 		"DJnqNZJn21HKJjEzjLTTWToBpvZPjomTnR",
 	}
 
-	require.NoError(t, VerifyP2PKHSignV1(msgTx, addresses, &dogecoin.MainNetParams))
+	require.NoError(t, VerifyP2PKHSign(msgTx, addresses, &dogecoin.MainNetParams))
 }
 
 func TestVerifyTx_DOGE_mainnet_3(t *testing.T) {
@@ -120,5 +120,5 @@ func TestVerifyTx_DOGE_mainnet_3(t *testing.T) {
 		"DHQsfy66JsYSnwjCABFN6NNqW4kHQe63oU",
 	}
 
-	require.NoError(t, VerifyP2PKHSignV1(msgTx, addresses, &dogecoin.MainNetParams))
+	require.NoError(t, VerifyP2PKHSign(msgTx, addresses, &dogecoin.MainNetParams))
 }
