@@ -118,6 +118,15 @@ func NewInputOuts(pkScripts [][]byte, amounts []int64) []*wire.TxOut {
 	return outs
 }
 
+func NewInputOutsV2(pkScripts [][]byte, amounts []btcutil.Amount) []*wire.TxOut {
+	size := max(len(pkScripts), len(amounts)) // must same size. so use the max size
+	outs := make([]*wire.TxOut, 0, size)
+	for idx := 0; idx < size; idx++ {
+		outs = append(outs, wire.NewTxOut(int64(amounts[idx]), pkScripts[idx]))
+	}
+	return outs
+}
+
 // GetMsgTxVSize 获得【签名后的】交易的大小，结果是 v-size 的，而且和链上的值相同
 func GetMsgTxVSize(msgTx *wire.MsgTx) int {
 	return int(math.Ceil(float64(3*msgTx.SerializeSizeStripped()+msgTx.SerializeSize()) / 4))

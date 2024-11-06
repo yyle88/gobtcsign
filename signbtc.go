@@ -82,8 +82,14 @@ func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 		// 设置见证
 		msgTx.TxIn[idx].Witness = witness
 	}
+	return VerifyP2WPKHSign(msgTx, inputOuts, prevOutFetcher, sigHashes)
+}
+
+func VerifyP2WPKHSign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut, prevOutFetcher txscript.PrevOutputFetcher, sigHashes *txscript.TxSigHashes) error {
+	sigCache := txscript.NewSigCache(uint(len(inputOuts))) //设置为输入的长度是较好的，当然，更大量的计算时也可使用全局的cache
+
 	for idx := range msgTx.TxIn {
-		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, nil, sigHashes, inputOuts[idx].Value, prevOutFetcher)
+		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, sigCache, sigHashes, inputOuts[idx].Value, prevOutFetcher)
 		if err != nil {
 			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
 		}

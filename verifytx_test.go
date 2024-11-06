@@ -14,19 +14,10 @@ func TestVerifyTx_DOGE_testnet(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(msgTx.TxHash().String())
 
-	const address = "nhwHQ29uEKnHeiWNLpU2zVHtcrZjaLKaHF"
 	netParams := &dogecoin.TestNetParams
-	pkScript, err := GetAddressPkScript(address, netParams)
-	require.NoError(t, err)
 
 	require.NoError(t, VerifyP2PKHSignV2(msgTx, []*VerifyTxInputParam{
-		&VerifyTxInputParam{
-			Sender: AddressTuple{
-				Address:  address,
-				PkScript: pkScript,
-			},
-			Amount: 0, //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
-		},
+		NewVerifyTxInputParam("nhwHQ29uEKnHeiWNLpU2zVHtcrZjaLKaHF", 0), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, netParams))
 }
 
@@ -37,19 +28,10 @@ func TestVerifyTx_DOGE_mainnet(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(msgTx.TxHash().String())
 
-	const address = "D6se3Ajq9mF8YD4p7jSXwZxewT6ePsnea6"
 	netParams := &dogecoin.MainNetParams
-	pkScript, err := GetAddressPkScript(address, netParams)
-	require.NoError(t, err)
 
 	require.NoError(t, VerifyP2PKHSignV2(msgTx, []*VerifyTxInputParam{
-		&VerifyTxInputParam{
-			Sender: AddressTuple{
-				Address:  address,
-				PkScript: pkScript,
-			},
-			Amount: 0, //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
-		},
+		NewVerifyTxInputParam("D6se3Ajq9mF8YD4p7jSXwZxewT6ePsnea6", 0), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, netParams))
 }
 
@@ -68,7 +50,7 @@ func TestVerifyTx_DOGE_mainnet_2(t *testing.T) {
 		"DJnqNZJn21HKJjEzjLTTWToBpvZPjomTnR",
 	}
 
-	require.NoError(t, VerifyP2PKHSignV3(msgTx, addresses, &dogecoin.MainNetParams))
+	require.NoError(t, VerifyP2PKHSignV1(msgTx, addresses, &dogecoin.MainNetParams))
 }
 
 func TestVerifyTx_DOGE_mainnet_3(t *testing.T) {
@@ -85,5 +67,5 @@ func TestVerifyTx_DOGE_mainnet_3(t *testing.T) {
 		"DHQsfy66JsYSnwjCABFN6NNqW4kHQe63oU",
 	}
 
-	require.NoError(t, VerifyP2PKHSignV3(msgTx, addresses, &dogecoin.MainNetParams))
+	require.NoError(t, VerifyP2PKHSignV1(msgTx, addresses, &dogecoin.MainNetParams))
 }
