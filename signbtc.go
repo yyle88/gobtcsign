@@ -63,11 +63,8 @@ func signP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 		inputOuts = signParam.InputOuts
 	)
 
-	// 创建并填充 prevOuts（前置输出映射）
-	prevOuts := newPrevOuts(signParam)
-
-	// 使用 prevOuts 初始化一个多前置输出提取器
-	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
+	// 创建 prevOuts（前置输出映射） 使用 prevOuts 初始化一个多前置输出提取器
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(newPrevOutsMap(signParam))
 
 	// 即可生成交易签名哈希
 	sigHashes := txscript.NewTxSigHashes(msgTx, prevOutFetcher)
@@ -101,17 +98,17 @@ func VerifyP2WPKHSign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut, prevOutFetcher
 }
 
 // 创建和填充 prevOuts（前置输出映射）
-func newPrevOuts(signParam *SignParam) map[wire.OutPoint]*wire.TxOut {
-	var prevOuts = make(map[wire.OutPoint]*wire.TxOut, len(signParam.MsgTx.TxIn))
+func newPrevOutsMap(signParam *SignParam) map[wire.OutPoint]*wire.TxOut {
+	var prevOutsMap = make(map[wire.OutPoint]*wire.TxOut, len(signParam.MsgTx.TxIn))
 	// 依然是只需要收集 vin 的信息
 	for idx, txIn := range signParam.MsgTx.TxIn {
 		// 这里从 amounts 和 pkScripts 中创建 TxOut 并映射到对应的 OutPoint
-		prevOuts[txIn.PreviousOutPoint] = wire.NewTxOut(
+		prevOutsMap[txIn.PreviousOutPoint] = wire.NewTxOut(
 			signParam.InputOuts[idx].Value,
 			signParam.InputOuts[idx].PkScript,
 		)
 	}
-	return prevOuts
+	return prevOutsMap
 }
 
 func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.PublicKey, senderAddress string) (bool, error) {
