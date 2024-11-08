@@ -5,8 +5,11 @@ import (
 	"encoding/hex"
 	"math"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
@@ -130,4 +133,12 @@ func NewInputOutsV2(pkScripts [][]byte, amounts []btcutil.Amount) []*wire.TxOut 
 // GetMsgTxVSize 获得【签名后的】交易的大小，结果是 v-size 的，而且和链上的值相同
 func GetMsgTxVSize(msgTx *wire.MsgTx) int {
 	return int(math.Ceil(float64(3*msgTx.SerializeSizeStripped()+msgTx.SerializeSize()) / 4))
+}
+
+func GetRawTransaction(client *rpcclient.Client, txHash string) (*btcjson.TxRawResult, error) {
+	oneHash, err := chainhash.NewHashFromStr(txHash)
+	if err != nil {
+		return nil, errors.WithMessage(err, "wrong param-tx-hash")
+	}
+	return client.GetRawTransactionVerbose(oneHash)
 }

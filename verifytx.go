@@ -119,7 +119,7 @@ func VerifySignV2(msgTx *wire.MsgTx, inputList []*VerifyTxInputParam, netParams 
 func VerifySignV3(msgTx *wire.MsgTx, inputsItem *VerifyTxInputsType) error {
 	inputFetcher, err := txauthor.TXPrevOutFetcher(msgTx, inputsItem.PkScripts, inputsItem.InAmounts)
 	if err != nil {
-		return errors.WithMessage(err, "cannot create prev out cache")
+		return errors.WithMessage(err, "wrong cannot-create-pre-out-cache")
 	}
 	sigHashCache := txscript.NewTxSigHashes(msgTx, inputFetcher)
 

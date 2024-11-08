@@ -13,10 +13,10 @@ func TestVerifyTx_BTC_testnet(t *testing.T) {
 
 	msgTx, err := NewMsgTxFromHex(txHex)
 	require.NoError(t, err)
-	t.Log(msgTx.TxHash().String())
+	t.Log(msgTx.TxHash().String()) //这个发送者是 P2PKH 的，在BTC系统中虽然 P2WPKH 更推荐但是 P2PKH 也是很常见的
 
 	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
-		NewVerifyTxInputParam("mtvw738RMLYhgKLShmjK5arHv9NmJSWZ8D", 70784889640),
+		NewVerifyTxInputParam("mtvw738RMLYhgKLShmjK5arHv9NmJSWZ8D", 70784889640), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, &chaincfg.TestNet3Params))
 }
 
@@ -25,10 +25,10 @@ func TestVerifyTx_BTC_testnet_2(t *testing.T) {
 
 	msgTx, err := NewMsgTxFromHex(txHex)
 	require.NoError(t, err)
-	t.Log(msgTx.TxHash().String())
+	t.Log(msgTx.TxHash().String()) //这个发送者也是 P2PKH 的
 
 	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
-		NewVerifyTxInputParam("n4rQnUNCiBR6mhFFgtzJaMjssDo6QohTEh", 4347958369),
+		NewVerifyTxInputParam("n4rQnUNCiBR6mhFFgtzJaMjssDo6QohTEh", 4347958369), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, &chaincfg.TestNet3Params))
 }
 
@@ -37,10 +37,10 @@ func TestVerifyTx_BTC_testnet_3(t *testing.T) {
 
 	msgTx, err := NewMsgTxFromHex(txHex)
 	require.NoError(t, err)
-	t.Log(msgTx.TxHash().String())
+	t.Log(msgTx.TxHash().String()) //这个发送者还是 P2PKH 的
 
 	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
-		NewVerifyTxInputParam("n4rQnUNCiBR6mhFFgtzJaMjssDo6QohTEh", 4341733718),
+		NewVerifyTxInputParam("n4rQnUNCiBR6mhFFgtzJaMjssDo6QohTEh", 4341733718), //P2PKH 签名不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
 	}, &chaincfg.TestNet3Params))
 }
 
@@ -49,14 +49,26 @@ func TestVerifyTx_BTC_testnet_4(t *testing.T) {
 
 	msgTx, err := NewMsgTxFromHex(txHex)
 	require.NoError(t, err)
-	t.Log(msgTx.TxHash().String())
+	t.Log(msgTx.TxHash().String()) //这个是 P2WPKH 的
 
 	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
-		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4900),
-		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4320),
-		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4560),
-		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4900),
-		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 22865),
+		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4900),  //当发送者是 P2WPKH 时，就需要检查数量，因此必须设置正确
+		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4320),  //当发送者是 P2WPKH 时，就需要检查数量，因此必须设置正确
+		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4560),  //当发送者是 P2WPKH 时，就需要检查数量，因此必须设置正确
+		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 4900),  //当发送者是 P2WPKH 时，就需要检查数量，因此必须设置正确
+		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 22865), //当发送者是 P2WPKH 时，就需要检查数量，因此必须设置正确
+	}, &chaincfg.TestNet3Params))
+}
+
+func TestVerifyTx_BTC_testnet_5(t *testing.T) {
+	const txHex = "010000000001011939727ec645869768167683487829f437cc37c664938345426d0df14e5df0e10200000000fdffffff02d204000000000000160014b3c4715e00a5ff9707ec7be2586e62d286ae4a18e80200000000000016001462152b40d8b2cbac358541d850c079ea10d1407f02483045022100e8269080acc14fd24ee13cbbdaa5ea34192f090c917b4ca3da44eda25badd58e02206813da9023bebd556a95e04e6a55c9a5fdf5dfb19746c896d7fd7f26aaa58878012102407ea64d7a9e992028a94481af95ea7d8f54870bd73e5878a014da594335ba3200000000"
+
+	msgTx, err := NewMsgTxFromHex(txHex)
+	require.NoError(t, err)
+	t.Log(msgTx.TxHash().String()) //这个是 P2WPKH 的，因为 P2WPKH 的用例有点少了这里再补充个新的
+
+	require.NoError(t, VerifySignV2(msgTx, []*VerifyTxInputParam{
+		NewVerifyTxInputParam("tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap", 13089), //当发送者是 P2WPKH 时，就需要检查数量，因此必须设置正确
 	}, &chaincfg.TestNet3Params))
 }
 

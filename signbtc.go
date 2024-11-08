@@ -16,7 +16,7 @@ import (
 // SignParam 这是待签名的交易信息，基本上最核心的信息就是这些，通过前面的逻辑能构造出这个结构，通过这个结构即可签名，签名后即可发交易
 type SignParam struct {
 	MsgTx     *wire.MsgTx   // 既是参数也是返回值：输入时签名前的交易，而最终返回也是在这里，会得到签名后的交易
-	InputOuts []*wire.TxOut // 在其它的教程里是 pkScripts [][]byte 和 amounts []int64 两个属性，这里合二为一以保持逻辑简洁
+	InputOuts []*wire.TxOut // 在其它的教程里是 pkScripts [][]byte 和 amounts []int64 两个属性，这里合二为一以保持逻辑简洁，使用 NewInputOuts 或 NewInputOutsV2 即可把两个数组合起来
 	NetParams *chaincfg.Params
 }
 
@@ -82,13 +82,17 @@ func SignP2WPKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) 
 func VerifySign(msgTx *wire.MsgTx, inputOuts []*wire.TxOut, prevOutFetcher txscript.PrevOutputFetcher, sigHashes *txscript.TxSigHashes) error {
 	sigCache := txscript.NewSigCache(uint(len(msgTx.TxIn))) //设置为输入的长度是较好的，当然，更大量的计算时也可使用全局的cache
 
+	if len(inputOuts) < len(msgTx.TxIn) { //在底下的逻辑里虽然也能保证，但在这里做一次判断能避免panic，也能避免哪次重构后遗漏这个隐含的条件，因此认为在这里增加个断言还是很有必要的
+		return errors.New("wrong param-outs-length")
+	}
+
 	for idx := range msgTx.TxIn { // 这段代码的作用是创建和执行脚本引擎，用于验证指定的脚本是否有效。如果脚本验证失败，则返回错误信息。这在比特币交易的验证过程中非常重要，以确保交易的合法性和安全性。
 		vm, err := txscript.NewEngine(inputOuts[idx].PkScript, msgTx, idx, txscript.StandardVerifyFlags, sigCache, sigHashes, inputOuts[idx].Value, prevOutFetcher)
 		if err != nil {
-			return errors.Errorf("wrong vm. index=%d error=%v", idx, err)
+			return errors.WithMessagef(err, "wrong new-vm-engine. index=%d", idx)
 		}
 		if err = vm.Execute(); err != nil {
-			return errors.Errorf("wrong vm execute. index=%d error=%v", idx, err)
+			return errors.WithMessagef(err, "wrong check-sign-vm-execute. index=%d", idx)
 		}
 	}
 	return nil
@@ -109,9 +113,9 @@ func newPrevOutsMap(signParam *SignParam) map[wire.OutPoint]*wire.TxOut {
 }
 
 func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.PublicKey, senderAddress string) (bool, error) {
-	for _, isCompress := range []bool{true, false} {
+	for _, compress := range []bool{true, false} {
 		var pubKeyHash []byte
-		if isCompress {
+		if compress {
 			pubKeyHash = btcutil.Hash160(publicKey.SerializeCompressed())
 		} else {
 			pubKeyHash = btcutil.Hash160(publicKey.SerializeUncompressed())
@@ -119,10 +123,10 @@ func CheckPKHAddressIsCompress(defaultNet *chaincfg.Params, publicKey *btcec.Pub
 
 		address, err := btcutil.NewAddressPubKeyHash(pubKeyHash, defaultNet)
 		if err != nil {
-			return isCompress, errors.Errorf("error=%v when is_compress=%v", err, isCompress)
+			return compress, errors.WithMessagef(err, "wrong when address-is-compress=%v", compress)
 		}
 		if address.EncodeAddress() == senderAddress {
-			return isCompress, nil
+			return compress, nil
 		}
 	}
 	return false, errors.Errorf("unknown address type. address=%s", senderAddress)
@@ -136,7 +140,7 @@ func SignP2PKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) e
 		// 在大多数情况下，使用压缩公钥是可以接受的，并且更常见。压缩公钥可以减小交易的大小，从而降低交易费用，并且在大多数情况下，与非压缩公钥相比，安全性没有明显的区别
 		signatureScript, err := txscript.SignatureScript(msgTx, idx, signParam.InputOuts[idx].PkScript, txscript.SigHashAll, privKey, compress)
 		if err != nil {
-			return errors.Errorf("wrong signature_script. index=%d error=%v", idx, err)
+			return errors.WithMessagef(err, "wrong signature_script. index=%d", idx)
 		}
 		msgTx.TxIn[idx].SignatureScript = signatureScript
 	}

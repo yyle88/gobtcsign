@@ -15,7 +15,7 @@ func TestSignBTC(t *testing.T) {
 
 	netParams := chaincfg.TestNet3Params
 
-	param := gobtcsign.CustomParam{
+	param := &gobtcsign.CustomParam{
 		VinList: []gobtcsign.VinType{
 			{
 				OutPoint: *gobtcsign.MustNewOutPoint("fb87cc4010bd4a34cb4be86f37182fada63c9923ae8eae5d2f793cb5f50c6328", 0),
@@ -83,7 +83,7 @@ func TestSignBTC(t *testing.T) {
 	//验证签名
 	require.NoError(t, gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
-	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
+	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, *param, &netParams))
 
 	//获得交易哈希
 	txHash := gobtcsign.GetTxHash(msgTx)

@@ -56,6 +56,9 @@ func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error)
 	if len(one.PkScript) > 0 {
 		return one.PkScript, nil //假如有就直接返回，否则就根据地址计算
 	}
+	if one.Address == "" {
+		return nil, errors.New("no-pk-script-no-address")
+	}
 	return GetAddressPkScript(one.Address, netParams) //这里不用做缓存避免增加复杂度
 }
 
@@ -67,14 +70,21 @@ type RBFConfig struct {
 func NewRBFActive() *RBFConfig {
 	return &RBFConfig{
 		AllowRBF: true,
-		Sequence: wire.MaxTxInSequenceNum - 2, // recommended sequence BTC推荐的默认启用RBF的就是这个数
+		Sequence: wire.MaxTxInSequenceNum - 2, // recommended sequence BTC推荐的默认启用RBF的就是这个数 // 选择 wire.MaxTxInSequenceNum - 2 而不是 wire.MaxTxInSequenceNum - 1 是出于一种谨慎性和规范性的考虑。虽然在技术上 wire.MaxTxInSequenceNum - 1 也可以支持 RBF，但 -2 更为常用
 	}
 }
 
 func NewRBFNotUse() *RBFConfig {
 	return &RBFConfig{
-		AllowRBF: false, //当两个元素都为零值时表示不启用RBF机制
-		Sequence: 0,     //当两个元素都为零值时表示不启用RBF机制
+		AllowRBF: false,                   //当两个元素都为零值时表示不启用RBF机制
+		Sequence: wire.MaxTxInSequenceNum, //当两个元素都为零值时表示不启用RBF机制，当然这里设置为  wire.MaxTxInSequenceNum 也行，逻辑已经做过判定
+	}
+}
+
+func NewRBFSeqNum(sequence uint32) *RBFConfig {
+	return &RBFConfig{
+		AllowRBF: sequence != wire.MaxTxInSequenceNum, //避免设置为0被误认为是不使用RBF的
+		Sequence: sequence,
 	}
 }
 
@@ -198,4 +208,80 @@ func (param *CustomParam) EstimateTxSize(netParams *chaincfg.Params, change *Cha
 
 func (param *CustomParam) EstimateTxFee(netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
 	return EstimateTxFee(param, netParams, change, feeRatePerKb, dustFee)
+}
+
+// CheckMsgTxParam 当签完名以后最好是再用这个函数检查检查，避免签名逻辑在有BUG时修改输入或输出的内容
+func (param *CustomParam) CheckMsgTxParam(msgTx *wire.MsgTx, netParams *chaincfg.Params) error {
+	return CheckMsgTxSameWithParam(msgTx, *param, netParams)
+}
+
+// NewCustomParamFromMsgTx 这里提供简易的逻辑把交易的原始参数再拼回来
+// 以校验参数和校验签名等信息
+// 因此该函数的主要作用是校验
+// 首先拿到已签名(待发送/已发送)的交易的 hex 数据，接着使用 NewMsgTxFromHex 即可得到交易数据
+// 接着使用此函数再反拼出原始参数，检查交易的费用，接着再检查签名
+// 第二个参数是设置如何获取前置输出的
+// 通常是使用 客户端 请求获取前置输出，但也可以使用map把前置输出存起来，因此使用 interface 获取前置输出，提供两种实现方案
+// 在项目中推荐使用 rpc 获取，这样就很方便，而在单元测试中则只需要通过 map 预先配置就行，避免网络请求也避免暴露节点配置
+func NewCustomParamFromMsgTx(msgTx *wire.MsgTx, preImp GetUtxoFromInterface) (*CustomParam, error) {
+	var vinList = make([]VinType, 0, len(msgTx.TxIn))
+	for _, vin := range msgTx.TxIn {
+		costUtxo := vin.PreviousOutPoint
+
+		utxoFrom, err := preImp.GetUtxoFrom(costUtxo)
+		if err != nil {
+			return nil, errors.WithMessage(err, "get-utxo-from")
+		}
+
+		vinList = append(vinList, VinType{
+			OutPoint: *wire.NewOutPoint(&costUtxo.Hash, costUtxo.Index),
+			Sender:   *utxoFrom.sender,
+			Amount:   utxoFrom.amount,
+			RBFInfo:  *NewRBFSeqNum(vin.Sequence),
+		})
+	}
+
+	var outList = make([]OutType, 0, len(msgTx.TxOut))
+	for _, out := range msgTx.TxOut {
+		outList = append(outList, OutType{
+			Target: AddressTuple{PkScript: out.PkScript},
+			Amount: out.Value,
+		})
+	}
+
+	param := &CustomParam{
+		VinList: vinList,
+		OutList: outList,
+		RBFInfo: *NewRBFNotUse(), //这里是不需要的，因为各个输入里将会有RBF的全部信息
+	}
+	return param, nil
+}
+
+// VerifyMsgTxSign 使用这个检查签名是否正确
+func (param *CustomParam) VerifyMsgTxSign(msgTx *wire.MsgTx, netParams *chaincfg.Params) error {
+	inputsItem, err := param.GetVerifyTxInputsItem(netParams)
+	if err != nil {
+		return errors.WithMessage(err, "wrong get-inputs")
+	}
+	if err := VerifySignV3(msgTx, inputsItem); err != nil {
+		return errors.WithMessage(err, "wrong verify-sign")
+	}
+	return nil
+}
+
+func (param *CustomParam) GetVerifyTxInputsItem(netParams *chaincfg.Params) (*VerifyTxInputsType, error) {
+	var res = &VerifyTxInputsType{
+		PkScripts: make([][]byte, 0, len(param.VinList)),
+		InAmounts: make([]btcutil.Amount, 0, len(param.VinList)),
+	}
+	for _, vin := range param.VinList {
+		pkScript, err := vin.Sender.GetPkScript(netParams)
+		if err != nil {
+			return nil, errors.WithMessage(err, "wrong sender.address->pk-script")
+		}
+		res.PkScripts = append(res.PkScripts, pkScript)
+
+		res.InAmounts = append(res.InAmounts, btcutil.Amount(vin.Amount))
+	}
+	return res, nil
 }

@@ -57,9 +57,9 @@ func main() {
 	msgTx := signParam.MsgTx
 
 	//验证签名
-	utils.MustDone(gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
+	utils.MustDone(param.VerifyMsgTxSign(msgTx, &netParams))
 	//比较信息
-	utils.MustDone(gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
+	utils.MustDone(param.CheckMsgTxParam(msgTx, &netParams))
 
 	//获得交易哈希
 	txHash := gobtcsign.GetTxHash(msgTx)
