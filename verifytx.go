@@ -117,13 +117,24 @@ func VerifySignV2(msgTx *wire.MsgTx, inputList []*VerifyTxInputParam, netParams 
 }
 
 func VerifySignV3(msgTx *wire.MsgTx, inputsItem *VerifyTxInputsType) error {
-	inputFetcher, err := txauthor.TXPrevOutFetcher(msgTx, inputsItem.PkScripts, inputsItem.InAmounts)
+	prevScripts := inputsItem.PkScripts
+	inputValues := inputsItem.InAmounts
+
+	return VerifySignV4(msgTx, prevScripts, inputValues)
+}
+
+// VerifySignV4 这是验证签名的函数，代码主要参考这里
+// https://github.com/btcsuite/btcwallet/blob/b4ff60753aaa3cf885fb09586755f67d41954942/wallet/createtx.go#L503
+// 这个 github 官方包 是非常重要的参考资料
+// https://github.com/btcsuite/btcwallet/blob/master/wallet/createtx.go
+func VerifySignV4(msgTx *wire.MsgTx, prevScripts [][]byte, inputValues []btcutil.Amount) error {
+	inputFetcher, err := txauthor.TXPrevOutFetcher(msgTx, prevScripts, inputValues)
 	if err != nil {
 		return errors.WithMessage(err, "wrong cannot-create-pre-out-cache")
 	}
 	sigHashCache := txscript.NewTxSigHashes(msgTx, inputFetcher)
 
-	inputOuts := NewInputOutsV2(inputsItem.PkScripts, inputsItem.InAmounts)
+	inputOuts := NewInputOutsV2(prevScripts, inputValues)
 
 	return VerifySign(msgTx, inputOuts, inputFetcher, sigHashCache)
 }
