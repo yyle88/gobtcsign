@@ -11,7 +11,7 @@ require (
 	github.com/btcsuite/btcwallet/wallet/txrules v1.2.2
 	github.com/btcsuite/btcwallet/wallet/txsizes v1.2.5
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
