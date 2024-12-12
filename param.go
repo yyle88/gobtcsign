@@ -3,13 +3,12 @@ package gobtcsign
 import (
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/pkg/errors"
 )
 
-// CustomParam 这是客户自定义的参数类型，表示要转入和转出的信息
-type CustomParam struct {
+// BitcoinTxParams 这是客户自定义的参数类型，表示要转入和转出的信息
+type BitcoinTxParams struct {
 	VinList []VinType //要转入进BTC节点的
 	OutList []OutType //要从BTC节点转出的-这里面通常包含1个目标（转账）和1个自己（找零）
 	RBFInfo RBFConfig //详见RBF机制，通常是需要启用RBF以免交易长期被卡的
@@ -22,81 +21,13 @@ type VinType struct {
 	RBFInfo  RBFConfig     //还是RBF机制，前面的是控制整个交易的，这里控制单个UTXO的
 }
 
-func MustNewOutPoint(srcTxHash string, utxoIndex uint32) *wire.OutPoint {
-	//which tx the utxo from.
-	utxoHash, err := chainhash.NewHashFromStr(srcTxHash)
-	if err != nil {
-		panic(errors.WithMessagef(err, "wrong param utxo-from-tx-hash=%s", srcTxHash))
-	}
-	return wire.NewOutPoint(
-		utxoHash,  //这个是收到 utxo 的交易哈希，即 utxo 是从哪里来的，配合位置索引序号构成唯一索引，就能确定是花的哪个utxo
-		utxoIndex, //这个是收到 utxo 的输出位置，比如一个交易中有多个输出，这里要选择输出的位置
-	)
-}
-
 type OutType struct {
 	Target AddressTuple //接收者信息，钱包地址和公钥文本，二选一填写即可
 	Amount int64        //聪的数量
 }
 
-type AddressTuple struct {
-	Address  string //钱包地址 和 公钥脚本 二选一填写即可
-	PkScript []byte //公钥脚本 和 钱包地址 二选一填写即可 PkScript（Public Key Script）在拼装交易和签名时使用
-}
-
-func NewAddressTuple(address string) *AddressTuple {
-	return &AddressTuple{
-		Address:  address,
-		PkScript: nil, //这里 address 和 pk-script 是二选一的，因此不设，在后续的逻辑里会根据地址获得 pk-script 信息
-	}
-}
-
-// GetPkScript 获得公钥文本，当公钥文本存在时就用已有的，否则就根据地址计算
-func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error) {
-	if len(one.PkScript) > 0 {
-		return one.PkScript, nil //假如有就直接返回，否则就根据地址计算
-	}
-	if one.Address == "" {
-		return nil, errors.New("no-pk-script-no-address")
-	}
-	return GetAddressPkScript(one.Address, netParams) //这里不用做缓存避免增加复杂度
-}
-
-type RBFConfig struct {
-	AllowRBF bool   //当需要RBF时需要设置，推荐启用RBF发交易，否则，当手续费过低时交易会卡在节点的内存池里
-	Sequence uint32 //这是后来出的功能，RBF，使用更高手续费重发交易用的，当BTC交易发出到系统以后假如没人打包（手续费过低时），就可以增加手续费覆盖旧的交易
-}
-
-func NewRBFActive() *RBFConfig {
-	return &RBFConfig{
-		AllowRBF: true,
-		Sequence: wire.MaxTxInSequenceNum - 2, // recommended sequence BTC推荐的默认启用RBF的就是这个数 // 选择 wire.MaxTxInSequenceNum - 2 而不是 wire.MaxTxInSequenceNum - 1 是出于一种谨慎性和规范性的考虑。虽然在技术上 wire.MaxTxInSequenceNum - 1 也可以支持 RBF，但 -2 更为常用
-	}
-}
-
-func NewRBFNotUse() *RBFConfig {
-	return &RBFConfig{
-		AllowRBF: false,                   //当两个元素都为零值时表示不启用RBF机制
-		Sequence: wire.MaxTxInSequenceNum, //当两个元素都为零值时表示不启用RBF机制，当然这里设置为  wire.MaxTxInSequenceNum 也行，逻辑已经做过判定
-	}
-}
-
-func NewRBFSeqNum(sequence uint32) *RBFConfig {
-	return &RBFConfig{
-		AllowRBF: sequence != wire.MaxTxInSequenceNum, //避免设置为0被误认为是不使用RBF的
-		Sequence: sequence,
-	}
-}
-
-func (cfg *RBFConfig) GetSequence() uint32 {
-	if cfg.AllowRBF || cfg.Sequence > 0 { //启用RBF机制，精确的RBF逻辑
-		return cfg.Sequence
-	}
-	return wire.MaxTxInSequenceNum //当两个元素都为零值时表示不启用RBF机制-因此这里使用默认的最大值表示不启用
-}
-
-// GetSignParam 根据用户的输入信息拼接交易
-func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, error) {
+// CreateTxSignParams 根据用户的输入信息拼接交易
+func (param *BitcoinTxParams) CreateTxSignParams(netParams *chaincfg.Params) (*SignParam, error) {
 	var msgTx = wire.NewMsgTx(wire.TxVersion)
 
 	//这是发送者和发送数量的列表，很明显，这是需要签名的关键信息，现在只把待签名信息收集起来
@@ -117,7 +48,7 @@ func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, 
 			return nil, errors.Errorf("wrong tx_in.sequence default value: %v", txIn.Sequence)
 		}
 		// 查看是否需要启用 RBF 机制
-		if seqNo := param.GetTxInSequenceNum(input); seqNo != wire.MaxTxInSequenceNum {
+		if seqNo := param.GetTxInputSequence(input); seqNo != wire.MaxTxInSequenceNum {
 			txIn.Sequence = seqNo
 		}
 		msgTx.AddTxIn(txIn)
@@ -138,7 +69,7 @@ func (param *CustomParam) GetSignParam(netParams *chaincfg.Params) (*SignParam, 
 	}, nil
 }
 
-func (param *CustomParam) GetOutputs(netParams *chaincfg.Params) ([]*wire.TxOut, error) {
+func (param *BitcoinTxParams) GetOutputs(netParams *chaincfg.Params) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(param.OutList))
 	for _, output := range param.OutList {
 		pkScript, err := output.Target.GetPkScript(netParams)
@@ -150,7 +81,7 @@ func (param *CustomParam) GetOutputs(netParams *chaincfg.Params) ([]*wire.TxOut,
 	return outputs, nil
 }
 
-func (param *CustomParam) GetTxInSequenceNum(input VinType) uint32 {
+func (param *BitcoinTxParams) GetTxInputSequence(input VinType) uint32 {
 	// 当你确实是需要对每个交易单独设置RBF时，就可以在这里设置，单独设置到这个 vin 里面
 	if seqNo := input.RBFInfo.GetSequence(); seqNo != wire.MaxTxInSequenceNum { //启用RBF机制，精确的RBF逻辑
 		return seqNo
@@ -171,7 +102,7 @@ func (param *CustomParam) GetTxInSequenceNum(input VinType) uint32 {
 }
 
 // GetInputList 把拼交易的参数转换为验签的参数
-func (param *CustomParam) GetInputList() []*VerifyTxInputParam {
+func (param *BitcoinTxParams) GetInputList() []*VerifyTxInputParam {
 	var inputList = make([]*VerifyTxInputParam, 0, len(param.VinList))
 	for _, x := range param.VinList {
 		inputList = append(inputList, &VerifyTxInputParam{
@@ -186,7 +117,7 @@ func (param *CustomParam) GetInputList() []*VerifyTxInputParam {
 }
 
 // GetFee 全部输入和全部输出的差额，即交易的费用
-func (param *CustomParam) GetFee() btcutil.Amount {
+func (param *BitcoinTxParams) GetFee() btcutil.Amount {
 	var sum int64
 	for _, v := range param.VinList {
 		sum += v.Amount
@@ -198,21 +129,16 @@ func (param *CustomParam) GetFee() btcutil.Amount {
 }
 
 // GetChangeAmountWithFee 根据交易费用计算出找零数量
-func (param *CustomParam) GetChangeAmountWithFee(fee btcutil.Amount) btcutil.Amount {
+func (param *BitcoinTxParams) GetChangeAmountWithFee(fee btcutil.Amount) btcutil.Amount {
 	return param.GetFee() - fee
 }
 
-func (param *CustomParam) EstimateTxSize(netParams *chaincfg.Params, change *ChangeTo) (int, error) {
+func (param *BitcoinTxParams) EstimateTxSize(netParams *chaincfg.Params, change *ChangeTo) (int, error) {
 	return EstimateTxSize(param, netParams, change)
 }
 
-func (param *CustomParam) EstimateTxFee(netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
+func (param *BitcoinTxParams) EstimateTxFee(netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
 	return EstimateTxFee(param, netParams, change, feeRatePerKb, dustFee)
-}
-
-// CheckMsgTxParam 当签完名以后最好是再用这个函数检查检查，避免签名逻辑在有BUG时修改输入或输出的内容
-func (param *CustomParam) CheckMsgTxParam(msgTx *wire.MsgTx, netParams *chaincfg.Params) error {
-	return CheckMsgTxSameWithParam(msgTx, *param, netParams)
 }
 
 // NewCustomParamFromMsgTx 这里提供简易的逻辑把交易的原始参数再拼回来
@@ -223,7 +149,7 @@ func (param *CustomParam) CheckMsgTxParam(msgTx *wire.MsgTx, netParams *chaincfg
 // 第二个参数是设置如何获取前置输出的
 // 通常是使用 客户端 请求获取前置输出，但也可以使用map把前置输出存起来，因此使用 interface 获取前置输出，提供两种实现方案
 // 在项目中推荐使用 rpc 获取，这样就很方便，而在单元测试中则只需要通过 map 预先配置就行，避免网络请求也避免暴露节点配置
-func NewCustomParamFromMsgTx(msgTx *wire.MsgTx, preImp GetUtxoFromInterface) (*CustomParam, error) {
+func NewCustomParamFromMsgTx(msgTx *wire.MsgTx, preImp GetUtxoFromInterface) (*BitcoinTxParams, error) {
 	var vinList = make([]VinType, 0, len(msgTx.TxIn))
 	for _, vin := range msgTx.TxIn {
 		costUtxo := vin.PreviousOutPoint
@@ -237,7 +163,7 @@ func NewCustomParamFromMsgTx(msgTx *wire.MsgTx, preImp GetUtxoFromInterface) (*C
 			OutPoint: *wire.NewOutPoint(&costUtxo.Hash, costUtxo.Index),
 			Sender:   *utxoFrom.sender,
 			Amount:   utxoFrom.amount,
-			RBFInfo:  *NewRBFSeqNum(vin.Sequence),
+			RBFInfo:  *NewRBFConfig(vin.Sequence),
 		})
 	}
 
@@ -249,7 +175,7 @@ func NewCustomParamFromMsgTx(msgTx *wire.MsgTx, preImp GetUtxoFromInterface) (*C
 		})
 	}
 
-	param := &CustomParam{
+	param := &BitcoinTxParams{
 		VinList: vinList,
 		OutList: outList,
 		RBFInfo: *NewRBFNotUse(), //这里是不需要的，因为各个输入里将会有RBF的全部信息
@@ -258,7 +184,7 @@ func NewCustomParamFromMsgTx(msgTx *wire.MsgTx, preImp GetUtxoFromInterface) (*C
 }
 
 // VerifyMsgTxSign 使用这个检查签名是否正确
-func (param *CustomParam) VerifyMsgTxSign(msgTx *wire.MsgTx, netParams *chaincfg.Params) error {
+func (param *BitcoinTxParams) VerifyMsgTxSign(msgTx *wire.MsgTx, netParams *chaincfg.Params) error {
 	inputsItem, err := param.GetVerifyTxInputsItem(netParams)
 	if err != nil {
 		return errors.WithMessage(err, "wrong get-inputs")
@@ -269,7 +195,7 @@ func (param *CustomParam) VerifyMsgTxSign(msgTx *wire.MsgTx, netParams *chaincfg
 	return nil
 }
 
-func (param *CustomParam) GetVerifyTxInputsItem(netParams *chaincfg.Params) (*VerifyTxInputsType, error) {
+func (param *BitcoinTxParams) GetVerifyTxInputsItem(netParams *chaincfg.Params) (*VerifyTxInputsType, error) {
 	var res = &VerifyTxInputsType{
 		PkScripts: make([][]byte, 0, len(param.VinList)),
 		InAmounts: make([]btcutil.Amount, 0, len(param.VinList)),

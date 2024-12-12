@@ -14,7 +14,7 @@ func main() {
 
 	netParams := chaincfg.TestNet3Params
 
-	param := gobtcsign.CustomParam{
+	param := gobtcsign.BitcoinTxParams{
 		VinList: []gobtcsign.VinType{
 			{
 				OutPoint: *gobtcsign.MustNewOutPoint("e1f05d4ef10d6d4245839364c637cc37f429784883761668978645c67e723919", 2),
@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("estimate-tx-size:", size) //这是预估值 略微 >= 实际值
 
 	//得到待签名的交易
-	signParam, err := param.GetSignParam(&netParams)
+	signParam, err := param.CreateTxSignParams(&netParams)
 	utils.MustDone(err)
 
 	fmt.Println("utxo inputs:", len(signParam.InputOuts))

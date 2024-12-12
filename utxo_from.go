@@ -8,7 +8,7 @@ import (
 )
 
 type GetUtxoFromInterface interface {
-	GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmountTuple, error)
+	GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmount, error)
 }
 
 type UtxoFromClient struct {
@@ -19,7 +19,7 @@ func NewUtxoFromClient(client *rpcclient.Client) *UtxoFromClient {
 	return &UtxoFromClient{client: client}
 }
 
-func (uc *UtxoFromClient) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmountTuple, error) {
+func (uc *UtxoFromClient) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmount, error) {
 	preTxn, err := GetRawTransaction(uc.client, utxo.Hash.String())
 	if err != nil {
 		return nil, errors.WithMessage(err, "get-raw-txn")
@@ -31,34 +31,34 @@ func (uc *UtxoFromClient) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmountTupl
 		return nil, errors.WithMessage(err, "get-pre-amt")
 	}
 
-	utxoFrom := NewUtxoSenderAmountTuple(
+	utxoFrom := NewUtxoSenderAmount(
 		NewAddressTuple(preOut.ScriptPubKey.Address),
 		int64(preAmt),
 	)
 	return utxoFrom, nil
 }
 
-type UtxoSenderAmountTuple struct {
+type UtxoSenderAmount struct {
 	sender *AddressTuple
 	amount int64
 }
 
-func NewUtxoSenderAmountTuple(sender *AddressTuple, amount int64) *UtxoSenderAmountTuple {
-	return &UtxoSenderAmountTuple{
+func NewUtxoSenderAmount(sender *AddressTuple, amount int64) *UtxoSenderAmount {
+	return &UtxoSenderAmount{
 		sender: sender,
 		amount: amount,
 	}
 }
 
-type UtxoFromOutMap struct {
-	mxp map[wire.OutPoint]*UtxoSenderAmountTuple
+type OutPointUtxoSenderAmountMap struct {
+	mxp map[wire.OutPoint]*UtxoSenderAmount
 }
 
-func NewUtxoFromOutMap(mxp map[wire.OutPoint]*UtxoSenderAmountTuple) *UtxoFromOutMap {
-	return &UtxoFromOutMap{mxp: mxp}
+func NewOutPointUtxoSenderAmountMap(mxp map[wire.OutPoint]*UtxoSenderAmount) *OutPointUtxoSenderAmountMap {
+	return &OutPointUtxoSenderAmountMap{mxp: mxp}
 }
 
-func (uc UtxoFromOutMap) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmountTuple, error) {
+func (uc OutPointUtxoSenderAmountMap) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmount, error) {
 	utxoFrom, ok := uc.mxp[utxo]
 	if !ok {
 		return nil, errors.Errorf("not-exist-utxo[%s:%d]", utxo.Hash.String(), utxo.Index)

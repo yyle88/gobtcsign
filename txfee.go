@@ -15,7 +15,7 @@ import (
 // 具体参考链接在
 // https://github.com/btcsuite/btcwallet/blob/b4ff60753aaa3cf885fb09586755f67d41954942/wallet/txauthor/author.go#L132
 // 由于是计算手续费的，因为这个交易里不应该包含找零的 output 信息，否则结果是无意义的
-func EstimateTxFee(param *CustomParam, netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
+func EstimateTxFee(param *BitcoinTxParams, netParams *chaincfg.Params, change *ChangeTo, feeRatePerKb btcutil.Amount, dustFee DustFee) (btcutil.Amount, error) {
 	//通过未签名的交易预估出签名后的交易大小，这里预估值会比线上的值略微大些，误差在个位数（具体看vin和out的个数）
 	maxSignedSize, err := EstimateTxSize(param, netParams, change)
 	if err != nil {
@@ -32,7 +32,7 @@ func EstimateTxFee(param *CustomParam, netParams *chaincfg.Params, change *Chang
 }
 
 // EstimateTxSize 通过未签名的交易，预估出签名后交易体的大小，结果是 v-size 的，而且略微>=实际值
-func EstimateTxSize(param *CustomParam, netParams *chaincfg.Params, change *ChangeTo) (int, error) {
+func EstimateTxSize(param *BitcoinTxParams, netParams *chaincfg.Params, change *ChangeTo) (int, error) {
 	var scripts = make([][]byte, 0, len(param.VinList))
 	for _, txIn := range param.VinList {
 		pkScript, err := txIn.Sender.GetPkScript(netParams)

@@ -9,5 +9,5 @@ func TestUtxoFromClient_GetUtxoFrom(t *testing.T) {
 }
 
 func TestUtxoFromOutMap_GetUtxoFrom(t *testing.T) {
-	var _ GetUtxoFromInterface = &UtxoFromOutMap{}
+	var _ GetUtxoFromInterface = &OutPointUtxoSenderAmountMap{}
 }

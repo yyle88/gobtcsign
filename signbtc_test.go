@@ -15,7 +15,7 @@ func TestSignBTC(t *testing.T) {
 
 	netParams := chaincfg.TestNet3Params
 
-	param := &gobtcsign.CustomParam{
+	param := &gobtcsign.BitcoinTxParams{
 		VinList: []gobtcsign.VinType{
 			{
 				OutPoint: *gobtcsign.MustNewOutPoint("fb87cc4010bd4a34cb4be86f37182fada63c9923ae8eae5d2f793cb5f50c6328", 0),
@@ -69,7 +69,7 @@ func TestSignBTC(t *testing.T) {
 	require.Equal(t, int64(23456), int64(param.GetFee()))
 
 	//得到待签名的交易
-	signParam, err := param.GetSignParam(&netParams)
+	signParam, err := param.CreateTxSignParams(&netParams)
 	require.NoError(t, err)
 
 	t.Log(len(signParam.InputOuts))
@@ -83,7 +83,7 @@ func TestSignBTC(t *testing.T) {
 	//验证签名
 	require.NoError(t, gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
-	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, *param, &netParams))
+	require.NoError(t, param.CheckMsgTxParam(msgTx, &netParams))
 
 	//获得交易哈希
 	txHash := gobtcsign.GetTxHash(msgTx)
@@ -108,7 +108,7 @@ func TestSignDOGE(t *testing.T) {
 
 	netParams := dogecoin.TestNetParams
 
-	param := gobtcsign.CustomParam{
+	param := gobtcsign.BitcoinTxParams{
 		VinList: []gobtcsign.VinType{
 			{
 				OutPoint: *gobtcsign.MustNewOutPoint("57a3514865d3f4c5cbd49270204aaf4928c4c10651430dcd0cb79b80cda5ef0b", 0),
@@ -148,7 +148,7 @@ func TestSignDOGE(t *testing.T) {
 	require.Equal(t, int64(345678), int64(param.GetFee()))
 
 	//得到待签名的交易
-	signParam, err := param.GetSignParam(&netParams)
+	signParam, err := param.CreateTxSignParams(&netParams)
 	require.NoError(t, err)
 
 	//签名
@@ -160,7 +160,7 @@ func TestSignDOGE(t *testing.T) {
 	//验证签名
 	require.NoError(t, gobtcsign.VerifySignV2(msgTx, param.GetInputList(), &netParams))
 	//比较信息
-	require.NoError(t, gobtcsign.CheckMsgTxSameWithParam(msgTx, param, &netParams))
+	require.NoError(t, param.CheckMsgTxParam(msgTx, &netParams))
 
 	//获得交易哈希
 	txHash := gobtcsign.GetTxHash(msgTx)

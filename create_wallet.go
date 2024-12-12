@@ -9,51 +9,63 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CreateWalletP2PKH 随机创建个比特币钱包
-// 你需要知道的是目前比特币的地址格式有5种，而这5种分别代表5个版本的，他们的签名逻辑各不相同
-// 随着系统的升级以后可能还会有更多的版本出现
-// 这里只是选择 P2PKH 这一种
-// 其次是比特币分为正式网络和测试网络，他们的地址也不是互通的
-// 需要在概念上区分清楚
-func CreateWalletP2PKH(netParams *chaincfg.Params) (address string, private string, err error) {
-	// 随机生成一个新的比特币私钥
+// CreateWalletP2PKH generates a Bitcoin wallet using the P2PKH format.
+// This function returns the wallet address and private key hex-string.
+// CreateWalletP2PKH 使用 P2PKH 格式生成比特币钱包。
+// 该函数返回钱包地址和私钥的十六进制格式。
+func CreateWalletP2PKH(netParams *chaincfg.Params) (addressString string, privateKeyHex string, err error) {
+	// Generate a new Bitcoin private key // 创建新的比特币私钥
 	privateKey, err := btcec.NewPrivateKey()
 	if err != nil {
-		return "", "", errors.WithMessage(err, "随机私钥出错")
+		return "", "", errors.WithMessage(err, "wrong to generate random private key")
 	}
-	// 通过私钥生成比特币地址的公钥
+
+	// Generate the public key hash (SHA256 -> RIPEMD160) from the private key // 从私钥生成公钥哈希（SHA256 -> RIPEMD160）
 	pubKeyHash := btcutil.Hash160(privateKey.PubKey().SerializeCompressed())
-	// 通过公钥得到地址
+
+	// Create a Bitcoin address using the public key hash // 使用公钥哈希生成比特币地址
 	addressPubKeyHash, err := btcutil.NewAddressPubKeyHash(pubKeyHash, netParams)
 	if err != nil {
-		return "", "", errors.WithMessage(err, "创建地址出错")
+		return "", "", errors.WithMessage(err, "wrong to create address from public key hash")
 	}
-	address = addressPubKeyHash.EncodeAddress() // 转换为浏览器里常用的字符串的结果
-	private = hex.EncodeToString(privateKey.Serialize())
-	return address, private, nil
+
+	// Return the generated address and private key (hex-encoded) // 返回生成的地址和私钥（十六进制编码）
+	addressString = addressPubKeyHash.EncodeAddress()
+	privateKeyHex = hex.EncodeToString(privateKey.Serialize())
+	return addressString, privateKeyHex, nil
 }
 
-func CreateWalletP2WPKH(netParams *chaincfg.Params) (address string, private string, err error) {
-	// 创建一个新的随机私钥
+// CreateWalletP2WPKH generates a Bitcoin wallet using the P2WPKH format.
+// This function returns the wallet address and private key hex-string.
+// CreateWalletP2WPKH 使用 P2WPKH 格式生成比特币钱包。
+// 该函数返回钱包地址和私钥的十六进制格式。
+func CreateWalletP2WPKH(netParams *chaincfg.Params) (addressString string, privateKeyHex string, err error) {
+	// Generate a new Bitcoin private key // 创建新的比特币私钥
 	privateKey, err := btcec.NewPrivateKey()
 	if err != nil {
-		return "", "", errors.WithMessage(err, "随机私钥出错")
+		return "", "", errors.WithMessage(err, "wrong to generate random private key")
 	}
-	// WIF（Wallet Import Format）私钥编码格式的类型
+
+	// Encode the private key using Wallet Import Format (WIF) // 使用 WIF 格式编码私钥
 	privateWif, err := btcutil.NewWIF(privateKey, netParams, true)
 	if err != nil {
-		return "", "", errors.WithMessage(err, "创建钱包引用格式出错")
+		return "", "", errors.WithMessage(err, "wrong to create Wallet Import Format (WIF) for private key")
 	}
-	// 直接从私钥生成公钥
+
+	// Get the public key // 获取公钥
 	pubKey := privateWif.PrivKey.PubKey()
-	// 计算公钥哈希（P2WPKH使用的公钥哈希是公钥的SHA256和RIPEMD160哈希值）
+
+	// Compute the public key hash (SHA256 -> RIPEMD160) // 计算公钥哈希（SHA256 -> RIPEMD160）
 	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	// 创建P2WPKH地址
+
+	// Create a P2WPKH address using the public key hash // 使用公钥哈希生成 P2WPKH 地址
 	witnessPubKeyHash, err := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, netParams)
 	if err != nil {
-		return "", "", errors.WithMessage(err, "创建P2WPKH地址出错")
+		return "", "", errors.WithMessage(err, "wrong to create P2WPKH address")
 	}
-	address = witnessPubKeyHash.EncodeAddress()
-	private = hex.EncodeToString(privateKey.Serialize())
-	return address, private, nil
+
+	// Return the generated address and private key (hex-encoded) // 返回生成的地址和私钥（十六进制编码）
+	addressString = witnessPubKeyHash.EncodeAddress()
+	privateKeyHex = hex.EncodeToString(privateKey.Serialize())
+	return addressString, privateKeyHex, nil
 }

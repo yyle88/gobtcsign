@@ -78,6 +78,18 @@ func MustGetPkScript(address btcutil.Address) []byte {
 	return pkScript
 }
 
+func MustNewOutPoint(srcTxHash string, utxoIndex uint32) *wire.OutPoint {
+	//which tx the utxo from.
+	utxoHash, err := chainhash.NewHashFromStr(srcTxHash)
+	if err != nil {
+		panic(errors.WithMessagef(err, "wrong param utxo-from-tx-hash=%s", srcTxHash))
+	}
+	return wire.NewOutPoint(
+		utxoHash,  //这个是收到 utxo 的交易哈希，即 utxo 是从哪里来的，配合位置索引序号构成唯一索引，就能确定是花的哪个utxo
+		utxoIndex, //这个是收到 utxo 的输出位置，比如一个交易中有多个输出，这里要选择输出的位置
+	)
+}
+
 // NewInputOuts 因为 SignParam 的成员里有 []*wire.TxOut 类型的前置输出字段
 // 但教程常用的是 pkScripts [][]byte 和 amounts []int64 两个属性
 // 因此这里写个转换逻辑

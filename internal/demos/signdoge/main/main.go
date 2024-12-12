@@ -14,7 +14,7 @@ func main() {
 
 	netParams := dogecoin.TestNetParams
 
-	param := gobtcsign.CustomParam{
+	param := gobtcsign.BitcoinTxParams{
 		VinList: []gobtcsign.VinType{
 			{
 				OutPoint: *gobtcsign.MustNewOutPoint(
@@ -47,7 +47,7 @@ func main() {
 	fmt.Println("estimate-tx-size:", size) //这是预估值 略微 >= 实际值
 
 	//得到待签名的交易
-	signParam, err := param.GetSignParam(&netParams)
+	signParam, err := param.CreateTxSignParams(&netParams)
 	utils.MustDone(err)
 
 	//签名

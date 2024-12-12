@@ -27,7 +27,7 @@ func TestEstimateTxSize(t *testing.T) {
 
 	netParams := chaincfg.MainNetParams
 
-	param := &CustomParam{
+	param := &BitcoinTxParams{
 		VinList: []VinType{
 			{
 				OutPoint: *MustNewOutPoint("6e8ca976bcd473565c1d6d96483c0ce2225b91c87661f03bdf6e5afc6511b17f", 1),
@@ -78,7 +78,7 @@ func TestEstimateTxSize_VIN_1_P2PKH(t *testing.T) {
 
 	netParams := chaincfg.MainNetParams
 
-	param := &CustomParam{
+	param := &BitcoinTxParams{
 		VinList: []VinType{
 			{
 				OutPoint: *MustNewOutPoint("c9a45420a135a5424c7b75a70f860a0dc7d9716496a782e55e7a1520971cc9a4", 0),
@@ -114,7 +114,7 @@ func TestEstimateTxFee(t *testing.T) {
 
 	netParams := dogecoin.TestNetParams
 
-	param := &CustomParam{
+	param := &BitcoinTxParams{
 		VinList: []VinType{
 			{
 				OutPoint: *MustNewOutPoint("5ae74f2d6c4a0513e3c75484a726820c2b0653c2b26352afe97f4bf813dcf859", 0),

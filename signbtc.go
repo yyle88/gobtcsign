@@ -154,8 +154,8 @@ func SignP2PKH(signParam *SignParam, privKey *btcec.PrivateKey, compress bool) e
 	return VerifySign(msgTx, signParam.InputOuts, prevOutFetcher, sigHashes)
 }
 
-// CheckMsgTxSameWithParam 避免签名逻辑修改数量和目标位置
-func CheckMsgTxSameWithParam(msgTx *wire.MsgTx, param CustomParam, netParams *chaincfg.Params) error {
+// CheckMsgTxParam 当签完名以后最好是再用这个函数检查检查，避免签名逻辑在有BUG时修改输入或输出的内容
+func (param *BitcoinTxParams) CheckMsgTxParam(msgTx *wire.MsgTx, netParams *chaincfg.Params) error {
 	// 验证输入的长度是否匹配
 	if len(msgTx.TxIn) != len(param.VinList) {
 		return errors.Errorf("input count mismatch: got %d, expected %d", len(msgTx.TxIn), len(param.VinList))
@@ -172,7 +172,7 @@ func CheckMsgTxSameWithParam(msgTx *wire.MsgTx, param CustomParam, netParams *ch
 			return errors.Errorf("input %d outpoint-index mismatch: got %v, expected %v", idx, txVin.PreviousOutPoint.Index, input.OutPoint.Index)
 		}
 		// 检查 vin 的 RBF 序号是否完全匹配
-		if seqNo := param.GetTxInSequenceNum(input); seqNo != txVin.Sequence {
+		if seqNo := param.GetTxInputSequence(input); seqNo != txVin.Sequence {
 			return errors.Errorf("input %d tx-in-sequence mismatch: got %v, expected %v", idx, txVin.Sequence, seqNo)
 		}
 	}
