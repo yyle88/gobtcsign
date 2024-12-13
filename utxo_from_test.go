@@ -5,9 +5,9 @@ import (
 )
 
 func TestUtxoFromClient_GetUtxoFrom(t *testing.T) {
-	var _ GetUtxoFromInterface = &UtxoFromClient{}
+	var _ GetUtxoFromInterface = &SenderAmountUtxoClient{}
 }
 
-func TestUtxoFromOutMap_GetUtxoFrom(t *testing.T) {
-	var _ GetUtxoFromInterface = &OutPointUtxoSenderAmountMap{}
+func TestSenderAmountUtxoCache_GetUtxoFrom(t *testing.T) {
+	var _ GetUtxoFromInterface = &SenderAmountUtxoCache{}
 }

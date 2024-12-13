@@ -21,52 +21,9 @@ func NewVerifyTxInputParam(senderAddress string, amount int64) *VerifyTxInputPar
 	}
 }
 
-func NewVerifyTxInputNotAmountParams(senders []string, netParams *chaincfg.Params) ([]*VerifyTxInputParam, error) {
-	var results = make([]*VerifyTxInputParam, 0, len(senders))
-
-	var a2pksMap = make(map[string][]byte, len(senders))
-	for _, address := range senders {
-		pkScript, ok := a2pksMap[address]
-		if !ok {
-			pks, err := GetAddressPkScript(address, netParams)
-			if err != nil {
-				return nil, errors.WithMessage(err, "cannot get pk-script")
-			}
-			a2pksMap[address] = pks
-			pkScript = pks
-		}
-
-		results = append(results, &VerifyTxInputParam{
-			Sender: AddressTuple{
-				Address:  address,
-				PkScript: pkScript,
-			},
-			Amount: 0, //绝大多数的签名，比如，P2PKH 签名，不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行
-		})
-	}
-	return results, nil
-}
-
 type VerifyTxInputsType struct {
 	PkScripts [][]byte
 	InAmounts []btcutil.Amount
-}
-
-func NewVerifyTxInputsType(inputList []*VerifyTxInputParam, netParams *chaincfg.Params) (*VerifyTxInputsType, error) {
-	var pkScripts = make([][]byte, 0, len(inputList))
-	var inAmounts = make([]btcutil.Amount, 0, len(inputList))
-	for idx := range inputList {
-		pkScript, err := inputList[idx].Sender.GetPkScript(netParams)
-		if err != nil {
-			return nil, errors.WithMessage(err, "wrong address->pk-script")
-		}
-		pkScripts = append(pkScripts, pkScript)
-		inAmounts = append(inAmounts, btcutil.Amount(inputList[idx].Amount))
-	}
-	return &VerifyTxInputsType{
-		PkScripts: pkScripts,
-		InAmounts: inAmounts,
-	}, nil
 }
 
 /*
@@ -83,11 +40,29 @@ VerifyP2PKHSign 验证签名是否有效，只有P2PKH的验证可以不验证�
 因此这里就是给的utxo的来源地址列表（按正确顺序排列，而且条数要相同）。
 */
 func VerifyP2PKHSign(msgTx *wire.MsgTx, senders []string, netParams *chaincfg.Params) error {
-	inputList, err := NewVerifyTxInputNotAmountParams(senders, netParams)
-	if err != nil {
-		return errors.WithMessage(err, "wrong new-input-params")
+	var results = make([]*VerifyTxInputParam, 0, len(senders))
+
+	var pksCache = make(map[string][]byte, len(senders))
+	for _, address := range senders {
+		pkScript, ok := pksCache[address]
+		if !ok {
+			script, err := GetAddressPkScript(address, netParams)
+			if err != nil {
+				return errors.WithMessage(err, "cannot get pk-script")
+			}
+			pksCache[address] = script
+			pkScript = script
+		}
+
+		results = append(results, &VerifyTxInputParam{
+			Sender: AddressTuple{
+				Address:  address,
+				PkScript: pkScript,
+			},
+			Amount: 0, //绝大多数的签名，比如，P2PKH 签名，不将 amount 包含在生成的签名哈希中，因此也不验证它，随便填都行，因此这里填0
+		})
 	}
-	return VerifySignV2(msgTx, inputList, netParams)
+	return VerifySignV2(msgTx, results, netParams)
 }
 
 /*
@@ -109,11 +84,20 @@ VerifySignV2 验证签名是否有效，同样的逻辑实现第二遍是为了�
 NewSigCache 创建的缓存通常不需要显式关闭或清理。它是一个内存中的数据结构，生命周期与其所在的应用程序或模块相同。
 */
 func VerifySignV2(msgTx *wire.MsgTx, inputList []*VerifyTxInputParam, netParams *chaincfg.Params) error {
-	inputsItem, err := NewVerifyTxInputsType(inputList, netParams)
-	if err != nil {
-		return errors.WithMessage(err, "wrong params-to-inputs")
+	var pkScripts = make([][]byte, 0, len(inputList))
+	var inAmounts = make([]btcutil.Amount, 0, len(inputList))
+	for idx := range inputList {
+		pkScript, err := inputList[idx].Sender.GetPkScript(netParams)
+		if err != nil {
+			return errors.WithMessage(err, "wrong address->pk-script")
+		}
+		pkScripts = append(pkScripts, pkScript)
+		inAmounts = append(inAmounts, btcutil.Amount(inputList[idx].Amount))
 	}
-	return VerifySignV3(msgTx, inputsItem)
+	return VerifySignV3(msgTx, &VerifyTxInputsType{
+		PkScripts: pkScripts,
+		InAmounts: inAmounts,
+	})
 }
 
 func VerifySignV3(msgTx *wire.MsgTx, inputsItem *VerifyTxInputsType) error {

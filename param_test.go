@@ -88,8 +88,8 @@ func TestCustomParam_VerifyMsgTxSign(t *testing.T) {
 
 	netParams := chaincfg.TestNet3Params
 
-	preMap := NewOutPointUtxoSenderAmountMap(map[wire.OutPoint]*UtxoSenderAmount{
-		*MustNewOutPoint("a06b4450eb63c8a245e799800e7554ef7a25d415874a957720bee79be8fc15e2", 1): NewUtxoSenderAmount(NewAddressTuple("tb1q92kpf4hlj5khmdalshlz6602lvs8vcakxz8hzq"), 49560582),
+	preMap := NewSenderAmountUtxoCache(map[wire.OutPoint]*SenderAmountUtxo{
+		*MustNewOutPoint("a06b4450eb63c8a245e799800e7554ef7a25d415874a957720bee79be8fc15e2", 1): NewSenderAmountUtxo(NewAddressTuple("tb1q92kpf4hlj5khmdalshlz6602lvs8vcakxz8hzq"), 49560582),
 	})
 
 	param, err := NewCustomParamFromMsgTx(msgTx, preMap)
@@ -112,9 +112,9 @@ func TestCustomParam_CheckMsgTxParam(t *testing.T) {
 
 	netParams := dogecoin.MainNetParams
 
-	preMap := NewOutPointUtxoSenderAmountMap(map[wire.OutPoint]*UtxoSenderAmount{
-		*MustNewOutPoint("cb15601f24db291d1ca679e769de5c10891fcd1f2b1257680813986bedda81b8", 0): NewUtxoSenderAmount(NewAddressTuple("D9taZdfvonxSn8USudmhqhwvE7wt3aPW79"), 9230995),
-		*MustNewOutPoint("90676039a3c6fefb32dfadcaed501d6c20c1d0dcbf4071487e35f22b8097b099", 2): NewUtxoSenderAmount(NewAddressTuple("D9taZdfvonxSn8USudmhqhwvE7wt3aPW79"), 437264864),
+	preMap := NewSenderAmountUtxoCache(map[wire.OutPoint]*SenderAmountUtxo{
+		*MustNewOutPoint("cb15601f24db291d1ca679e769de5c10891fcd1f2b1257680813986bedda81b8", 0): NewSenderAmountUtxo(NewAddressTuple("D9taZdfvonxSn8USudmhqhwvE7wt3aPW79"), 9230995),
+		*MustNewOutPoint("90676039a3c6fefb32dfadcaed501d6c20c1d0dcbf4071487e35f22b8097b099", 2): NewSenderAmountUtxo(NewAddressTuple("D9taZdfvonxSn8USudmhqhwvE7wt3aPW79"), 437264864),
 	})
 
 	param, err := NewCustomParamFromMsgTx(msgTx, preMap)
@@ -137,10 +137,10 @@ func TestCustomParam_CheckMsgTxParam_BTC(t *testing.T) {
 
 	netParams := chaincfg.MainNetParams
 
-	preMap := NewOutPointUtxoSenderAmountMap(map[wire.OutPoint]*UtxoSenderAmount{
-		*MustNewOutPoint("d19f5a52f98c4bbc25421913ba450c48b3ccd56d042518c92bb6e9656b65e648", 1): NewUtxoSenderAmount(NewAddressTuple("bc1qvuhjmgfr4kxye8eh63qvkv3yst950u8mye9fxh"), 700623171),
-		*MustNewOutPoint("d8824a43740567d0f1f7e214462ceb0494142194d1b8a55b66b1276edfaa88c0", 0): NewUtxoSenderAmount(NewAddressTuple("bc1q963tmm9tv9884k60puxc3syyld0xzte3duy9uc"), 17232),
-		*MustNewOutPoint("f9999fb7df8edf4d6aa95189bb6eccabde67d99657ee5e1dc93e3f1f815841cb", 0): NewUtxoSenderAmount(NewAddressTuple("bc1q963tmm9tv9884k60puxc3syyld0xzte3duy9uc"), 17191),
+	preMap := NewSenderAmountUtxoCache(map[wire.OutPoint]*SenderAmountUtxo{
+		*MustNewOutPoint("d19f5a52f98c4bbc25421913ba450c48b3ccd56d042518c92bb6e9656b65e648", 1): NewSenderAmountUtxo(NewAddressTuple("bc1qvuhjmgfr4kxye8eh63qvkv3yst950u8mye9fxh"), 700623171),
+		*MustNewOutPoint("d8824a43740567d0f1f7e214462ceb0494142194d1b8a55b66b1276edfaa88c0", 0): NewSenderAmountUtxo(NewAddressTuple("bc1q963tmm9tv9884k60puxc3syyld0xzte3duy9uc"), 17232),
+		*MustNewOutPoint("f9999fb7df8edf4d6aa95189bb6eccabde67d99657ee5e1dc93e3f1f815841cb", 0): NewSenderAmountUtxo(NewAddressTuple("bc1q963tmm9tv9884k60puxc3syyld0xzte3duy9uc"), 17191),
 	})
 
 	param, err := NewCustomParamFromMsgTx(msgTx, preMap)
@@ -163,10 +163,10 @@ func TestCustomParam_CheckMsgTxParam_BTC_TXN(t *testing.T) {
 
 	netParams := chaincfg.MainNetParams
 
-	preMap := NewOutPointUtxoSenderAmountMap(map[wire.OutPoint]*UtxoSenderAmount{
-		*MustNewOutPoint("56ee8ace223a6fb8585458866ba2a5c5d620ccf968eca3060c28e1033f198c89", 6): NewUtxoSenderAmount(NewAddressTuple("bc1qrhut5t4g2wa2lf9h48fcth869h48khe0avxlq60vs5m0y2s8memq6fjt7r"), 31759346),
-		*MustNewOutPoint("840bdc8d28b5919ea2a8f19e9993109ebd297f5279a6e00e70278684ec187d8d", 3): NewUtxoSenderAmount(NewAddressTuple("bc1qlhqvxmpcqqw64r82h7sm89hn5n8g9p7w6y2m7cxkvtytavgthups57rnws"), 16616320),
-		*MustNewOutPoint("c57c06e4f2207420663fdf3d8a92a5a5755da469591b9677a03bc8247b36f590", 2): NewUtxoSenderAmount(NewAddressTuple("bc1q673p5npwsz78j4vdzqltsa4fvtvpteynudu446n56xrpy38tgrkqjmzwpk"), 15201401),
+	preMap := NewSenderAmountUtxoCache(map[wire.OutPoint]*SenderAmountUtxo{
+		*MustNewOutPoint("56ee8ace223a6fb8585458866ba2a5c5d620ccf968eca3060c28e1033f198c89", 6): NewSenderAmountUtxo(NewAddressTuple("bc1qrhut5t4g2wa2lf9h48fcth869h48khe0avxlq60vs5m0y2s8memq6fjt7r"), 31759346),
+		*MustNewOutPoint("840bdc8d28b5919ea2a8f19e9993109ebd297f5279a6e00e70278684ec187d8d", 3): NewSenderAmountUtxo(NewAddressTuple("bc1qlhqvxmpcqqw64r82h7sm89hn5n8g9p7w6y2m7cxkvtytavgthups57rnws"), 16616320),
+		*MustNewOutPoint("c57c06e4f2207420663fdf3d8a92a5a5755da469591b9677a03bc8247b36f590", 2): NewSenderAmountUtxo(NewAddressTuple("bc1q673p5npwsz78j4vdzqltsa4fvtvpteynudu446n56xrpy38tgrkqjmzwpk"), 15201401),
 	})
 
 	param, err := NewCustomParamFromMsgTx(msgTx, preMap)

@@ -52,7 +52,7 @@ func Sign(senderAddress string, privateKeyHex string, param *SignParam) error {
 			return errors.WithMessage(err, "wrong sign")
 		}
 	default: //其它钱包类型暂不支持
-		return errors.Errorf("From地址 %s 属于 %s 类型, 类型错误", address, reflect.TypeOf(address).String()) //倒是没必要支持太多的类型
+		return errors.Errorf("wrong from address=%s address_type=%s not-support-this-address-type", address, reflect.TypeOf(address).String()) //倒是没必要支持太多的类型
 	}
 	return nil
 }

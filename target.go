@@ -8,7 +8,7 @@ import (
 )
 
 type AddressTuple struct {
-	Address  string //钱包地址 和 公钥脚本 二选一填写即可
+	Address  string //钱包地址 和 公钥脚本 二选一填写即可 当 Address 和 PkScript 同时存在时，需要保证匹配
 	PkScript []byte //公钥脚本 和 钱包地址 二选一填写即可 PkScript（Public Key Script）在拼装交易和签名时使用
 }
 
@@ -27,7 +27,7 @@ func (one *AddressTuple) GetPkScript(netParams *chaincfg.Params) ([]byte, error)
 		if err != nil {
 			return nil, errors.WithMessage(err, "wrong-address")
 		}
-		if bytes.Compare(one.PkScript, pkScript) != 0 {
+		if !bytes.Equal(one.PkScript, pkScript) {
 			return nil, errors.New("address-pk-script-mismatch")
 		}
 		return pkScript, nil
@@ -47,7 +47,7 @@ func (one *AddressTuple) VerifyMatch(netParams *chaincfg.Params) error {
 		if err != nil {
 			return errors.WithMessage(err, "wrong-address")
 		}
-		if bytes.Compare(one.PkScript, pkScript) != 0 {
+		if !bytes.Equal(one.PkScript, pkScript) {
 			return errors.New("address-pk-script-mismatch")
 		}
 	}

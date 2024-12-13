@@ -8,60 +8,60 @@ import (
 )
 
 type GetUtxoFromInterface interface {
-	GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmount, error)
+	GetUtxoFrom(utxo wire.OutPoint) (*SenderAmountUtxo, error)
 }
 
-type UtxoFromClient struct {
+type SenderAmountUtxoClient struct {
 	client *rpcclient.Client
 }
 
-func NewUtxoFromClient(client *rpcclient.Client) *UtxoFromClient {
-	return &UtxoFromClient{client: client}
+func NewSenderAmountUtxoClient(client *rpcclient.Client) *SenderAmountUtxoClient {
+	return &SenderAmountUtxoClient{client: client}
 }
 
-func (uc *UtxoFromClient) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmount, error) {
-	preTxn, err := GetRawTransaction(uc.client, utxo.Hash.String())
+func (uc *SenderAmountUtxoClient) GetUtxoFrom(utxo wire.OutPoint) (*SenderAmountUtxo, error) {
+	previousUtxoTx, err := GetRawTransaction(uc.client, utxo.Hash.String())
 	if err != nil {
-		return nil, errors.WithMessage(err, "get-raw-txn")
+		return nil, errors.WithMessage(err, "get-raw-transaction")
 	}
-	preOut := preTxn.Vout[utxo.Index]
+	previousOutput := previousUtxoTx.Vout[utxo.Index]
 
-	preAmt, err := btcutil.NewAmount(preOut.Value)
+	previousAmount, err := btcutil.NewAmount(previousOutput.Value)
 	if err != nil {
-		return nil, errors.WithMessage(err, "get-pre-amt")
+		return nil, errors.WithMessage(err, "get-previous-amount")
 	}
 
-	utxoFrom := NewUtxoSenderAmount(
-		NewAddressTuple(preOut.ScriptPubKey.Address),
-		int64(preAmt),
+	utxoFrom := NewSenderAmountUtxo(
+		NewAddressTuple(previousOutput.ScriptPubKey.Address),
+		int64(previousAmount),
 	)
 	return utxoFrom, nil
 }
 
-type UtxoSenderAmount struct {
+type SenderAmountUtxo struct {
 	sender *AddressTuple
 	amount int64
 }
 
-func NewUtxoSenderAmount(sender *AddressTuple, amount int64) *UtxoSenderAmount {
-	return &UtxoSenderAmount{
+func NewSenderAmountUtxo(sender *AddressTuple, amount int64) *SenderAmountUtxo {
+	return &SenderAmountUtxo{
 		sender: sender,
 		amount: amount,
 	}
 }
 
-type OutPointUtxoSenderAmountMap struct {
-	mxp map[wire.OutPoint]*UtxoSenderAmount
+type SenderAmountUtxoCache struct {
+	outputUtxoMap map[wire.OutPoint]*SenderAmountUtxo
 }
 
-func NewOutPointUtxoSenderAmountMap(mxp map[wire.OutPoint]*UtxoSenderAmount) *OutPointUtxoSenderAmountMap {
-	return &OutPointUtxoSenderAmountMap{mxp: mxp}
+func NewSenderAmountUtxoCache(utxoMap map[wire.OutPoint]*SenderAmountUtxo) *SenderAmountUtxoCache {
+	return &SenderAmountUtxoCache{outputUtxoMap: utxoMap}
 }
 
-func (uc OutPointUtxoSenderAmountMap) GetUtxoFrom(utxo wire.OutPoint) (*UtxoSenderAmount, error) {
-	utxoFrom, ok := uc.mxp[utxo]
+func (uc SenderAmountUtxoCache) GetUtxoFrom(utxo wire.OutPoint) (*SenderAmountUtxo, error) {
+	utxoFrom, ok := uc.outputUtxoMap[utxo]
 	if !ok {
-		return nil, errors.Errorf("not-exist-utxo[%s:%d]", utxo.Hash.String(), utxo.Index)
+		return nil, errors.Errorf("wrong utxo[%s:%d] not-exist-in-cache", utxo.Hash.String(), utxo.Index)
 	}
 	return utxoFrom, nil
 }
