@@ -2,9 +2,9 @@ package utils
 
 import "fmt"
 
-func MustDone(erx error) {
-	if erx != nil {
-		panic(erx)
+func MustDone(err error) {
+	if err != nil {
+		panic(err)
 	}
 }
 
