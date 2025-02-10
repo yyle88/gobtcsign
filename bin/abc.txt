@@ -1,0 +1,6 @@
+    create_wallet_test.go:61: tb1qvg2jksxckt96cdv9g8v9psreaggdzsrlm6arap
+    create_wallet_test.go:62: 54bb1426611226077889d63c65f4f1fa212bcb42c2141c81e0c5409324711092
+
+
+    create_wallet_test.go:61: tb1qk0z8zhsq5hlewplv0039smnz62r2ujscz6gqjx
+    create_wallet_test.go:62: 02cb689807ba33c15ac4de224e850b18252dcb1f8ee48708b3edeedd4bfdb549
