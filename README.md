@@ -1,3 +1,11 @@
+<p align="center">
+  <img alt="wojack-cartoon logo" src="assets/wojack-cartoon.jpeg" height="500" />
+</p>
+<h3 align="center">golang-bitcoin</h3>
+<p align="center">create/sign <code>golang-bitcoin transaction</code> with golang</p>
+
+---
+
 [![GitHub Workflow Status (branch)](https://img.shields.io/github/actions/workflow/status/yyle88/gobtcsign/release.yml?branch=main&label=BUILD)](https://github.com/yyle88/gobtcsign/actions/workflows/release.yml?query=branch%3Amain)
 [![GoDoc](https://pkg.go.dev/badge/github.com/yyle88/gobtcsign)](https://pkg.go.dev/github.com/yyle88/gobtcsign)
 [![Coverage Status](https://img.shields.io/coveralls/github/yyle88/gobtcsign/master.svg)](https://coveralls.io/github/yyle88/gobtcsign?branch=main)
@@ -147,15 +155,15 @@ This project exists solely for the purpose of technical learning and exploration
 
 ## License
 
-`gobtcsign` is open-source and released under the MIT License. See the [LICENSE](LICENSE) file for more information.
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
 ## Support
 
-Welcome to contribute to this project by submitting pull requests or reporting issues.
+Welcome to contribute to this project by submitting pull requests and reporting issues.
 
-If you find this package helpful, give it a star on GitHub!
+If you find this package valuable, give me some stars on GitHub! Thank you!!!
 
 **Thank you for your support!**
 
@@ -165,6 +173,6 @@ Give me stars. Thank you!!!
 
 ---
 
-## Starring
+## GitHub Stars
 
 [![starring](https://starchart.cc/yyle88/gobtcsign.svg?variant=adaptive)](https://starchart.cc/yyle88/gobtcsign)
